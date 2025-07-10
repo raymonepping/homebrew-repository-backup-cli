@@ -1,0 +1,5 @@
+# .brewinfo
+NAME=radar_love_cli
+VERSION=1.2.0
+DESCRIPTION="CLI toolkit for simulating secret leaks and triggering GitHub PR scans"
+HOMEPAGE=https://github.com/raymonepping/radar_love_cli

@@ -1,0 +1,8 @@
+# All files require approval by you (repo maintainer)
+* @raymonepping
+
+# Optional: Require your review for specific folders
+scripts/** @raymonepping
+core/** @raymonepping
+tests/** @raymonepping
+.github/** @raymonepping

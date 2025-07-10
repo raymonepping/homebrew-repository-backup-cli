@@ -1,0 +1,9 @@
+# Ignore node_modules, git, and temp files
+.github/
+.git/
+*.swp
+backup/
+restore_*
+bin/.DS_Store
+test/*
+radar_love_cli*.gz

@@ -3,9 +3,9 @@
   "backup_dir": "/Users/raymon.epping/Documents/VSC/MacOS_Environment/medium_scripts/radar_backup/backup",
   "catalog_dir": "/Users/raymon.epping/Documents/VSC/MacOS_Environment/medium_scripts/radar_backup/catalog",
   "include": [
-    "bin/",
+    "bin/*",
     "catalog/",
-    "core/",
+    "core/*",
     "Formula/",
     "LICENSE",
     "README.md"

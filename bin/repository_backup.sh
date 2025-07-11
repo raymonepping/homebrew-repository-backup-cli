@@ -25,6 +25,8 @@ RESTORE_OLDEST="false"
 RESTORE_LATEST="false"
 FORCE=false
 EMERGENCY_RESTORE="false"
+SUMMARY="false"
+
 
 # --- Help ---
 show_help() {
@@ -98,6 +100,10 @@ while [[ $# -gt 0 ]]; do
       COUNT="$2"
       shift 2
       ;;
+    --summary)
+      SUMMARY=true
+      shift
+      ;;
     --dryrun)
       DRYRUN=true
       shift
@@ -134,6 +140,15 @@ CONFIG_FILE="$TARGET/.backup.json"
 IGNORE_FILE="$TARGET/.backupignore"
 MDLOG="$CATALOG_DIR/backup_log.md"
 TPL="$SCRIPT_DIR/../core/backup_log.tpl"
+
+if [[ "$SUMMARY" == "true" ]]; then
+  TMP_SUMMARY=$(mktemp)
+  get_last_n_backups "$MDLOG" "$COUNT" >"$TMP_SUMMARY"
+  cat "$TMP_SUMMARY"
+  rm -f "$TMP_SUMMARY"
+  exit 0
+fi
+
 
 if [[ "$PRUNE" == "true" ]]; then
   radar_backup_prune "$BACKUP_DIR" "$COUNT" "$DRYRUN"

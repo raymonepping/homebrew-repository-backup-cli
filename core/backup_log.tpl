@@ -50,3 +50,16 @@ Variables explained:
 - `{{SUMMARY_ROWS}}`: Table rows with last backups info
 - `{{EXCLUSIONS}}`: Text block with patterns
 - `{{INTEGRITY}}`: Markdown/text block (passed/failed, hash check, etc)
+✅ Restored v0.1.0_20250711_210331.tar.gz into folder ./backups/repository_backup_cli/v0.1.0_20250711_210331
+❌ Restored v0.1.0_20250711_194022.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194022 — checksum mismatch!
+❌ Restored v0.1.0_20250711_194022.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194022 — checksum mismatch!
+✅ Restored v0.1.0_20250711_194732.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194732
+✅ Integrity check: PASSED (diff verified)
+✅ Restored v0.1.0_20250711_194732.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194732
+✅ Integrity check: PASSED (diff verified)
+✅ Restored v0.1.0_20250711_194732.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194732
+✅ Integrity check: PASSED (diff verified)
+✅ Restored v0.1.0_20250711_194732.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_194732
+❌ Restored v0.1.0_20250711_200514.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_200514 — content mismatch!
+❌ Restored v0.1.0_20250711_222026.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_222026 — content mismatch!
+❌ Restored v0.1.0_20250711_222026.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_222026 — content mismatch!

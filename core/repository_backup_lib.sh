@@ -343,6 +343,120 @@ write_log_md_from_tpl() {
     >"$out"
 }
 
+log_restore_summary() {
+  local archive="$1"
+  local dest="$2"
+  local tpl="$3"
+
+  echo "✅ Restored $(basename "$archive") into folder $dest" >>"$tpl"
+}
+
+restore_backup_with_diff() {
+  local archive="$1"
+  local target_dir="$2"
+  local tpl_path="$3"
+  local force="${4:-false}"  # <-- pick up force from CLI
+
+  local base_name
+  base_name="$(basename "$archive" .tar.gz)"
+  local restore_path="./${target_dir}/${base_name}"
+
+  local fresh_extract=true
+
+  if [[ -d "$restore_path" ]]; then
+    if [[ "$force" == "true" ]]; then
+      backup_warn "🚨 Force overwrite enabled — removing existing folder: $restore_path"
+      rm -rf "$restore_path"
+      mkdir -p "$restore_path"
+      tar -xzf "$archive" -C "$restore_path"
+      backup_info "📦 Force-extracted archive to: $restore_path"
+    else
+      backup_warn "⚠️  Skipping overwrite of $restore_path — verifying integrity instead"
+      fresh_extract=false
+    fi
+  else
+    mkdir -p "$restore_path"
+    tar -xzf "$archive" -C "$restore_path"
+    backup_info "📦 Extracted archive to: $restore_path"
+  fi
+
+  # Step 2: Extract original archive to temp dir for comparison
+  local temp_extract
+  temp_extract=$(mktemp -d)
+  tar -xzf "$archive" -C "$temp_extract"
+
+  # Step 3: Perform content-based diff, excluding noise
+  local diff_output
+  diff_output=$(diff -qr "$restore_path" "$temp_extract" | grep -vE '\.DS_Store|__MACOSX')
+
+  if [[ -z "$diff_output" ]]; then
+    echo "🔒 Integrity successfully validated — archive matches expected contents."
+    log_restore_summary "$archive" "$restore_path" "$tpl_path"
+    log_restore_entry "diff" "$archive" "$restore_path" "$target_dir" "$MDLOG" "$tpl_path"
+  else
+    backup_err "❌ Archive restored to: $restore_path — but content mismatch!"
+    echo "$diff_output"
+    echo "❌ Restored $(basename "$archive") into folder $restore_path — content mismatch!" >> "$tpl_path"
+  fi
+
+  # Step 4: Clean up
+  rm -rf "$temp_extract"
+
+  if [[ "$fresh_extract" == true || "$force" == "true" ]]; then
+    backup_ok "✅ Archive restored to: $restore_path"
+  else
+    backup_info "✅ Integrity check completed for existing: $restore_path"
+  fi
+}
+
+
+# remove
+restore_backup_with_checksum() {
+  local archive="$1"
+  local target_dir="$2"
+  local tpl_path="$3"
+
+  local base_name
+  base_name="$(basename "$archive" .tar.gz)"
+  local restore_path="./${target_dir}/${base_name}"
+
+  mkdir -p "$restore_path"
+  # tar -xzf "$archive" -C "$restore_path"
+  # Step 1: Use existing restored folder if it already exists
+  if [[ ! -d "$restore_path" ]]; then
+    tar -xzf "$archive" -C "$restore_path"
+  else
+    backup_warn "⚠️  Skipping overwrite of $restore_path — verifying integrity instead"
+  fi
+
+
+  # Compute original MD5
+  local original_md5
+  original_md5=$(md5sum "$archive" | awk '{print $1}')
+
+  # Repack restored files to temp archive
+  local temp_tar="./${target_dir}/${base_name}_temp.tar.gz"
+  tar -czf "$temp_tar" -C "$restore_path" .
+
+  # Compute restored MD5
+  local restored_md5
+  restored_md5=$(md5sum "$temp_tar" | awk '{print $1}')
+
+  # Cleanup
+  rm -f "$temp_tar"
+
+  # Compare checksums
+  if [[ "$original_md5" == "$restored_md5" ]]; then
+    echo "✅ Archive restored to: $restore_path"
+    log_restore_summary "$archive" "$restore_path" "$tpl_path"
+  else
+    echo "❌ Archive restored to: $restore_path — but checksum mismatch!"
+    echo "❌ Restored $(basename "$archive") into folder $restore_path — checksum mismatch!" >>"$tpl_path"
+  fi
+
+  echo "✅ Archive restored to: $restore_path"
+}
+
 # --- CLI exposed entrypoints ---
 # radar_backup_create() { backup_project "$1" "$2" "$3" "$4" "$5" "$6" "${7:-}"; }
 radar_backup_create() { backup_project "$@"; }

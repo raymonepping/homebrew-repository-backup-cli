@@ -2,7 +2,7 @@
 # --- radar_backup_lib.sh ---
 # Modular backup/restore/prune/summary logic for Radar Love (and friends)
 # shellcheck disable=SC2034
-VERSION="1.0.2"
+VERSION="1.0.3"
 
 QUIET="${QUIET:-false}"
 
@@ -269,7 +269,8 @@ recover_backup() {
   }
 
   tar xzf "$full_path" -C "$root"
-  backup_ok "Backup $(basename "$full_path") recovered into $root"
+  backup_ok "✅ Restored $(basename "$full_path") into $(basename "$root")"
+  # backup_ok "Backup $(basename "$full_path") recovered into $root"
 }
 
 prune_backups() {

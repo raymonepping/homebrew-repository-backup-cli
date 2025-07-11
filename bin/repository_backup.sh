@@ -13,7 +13,7 @@ source "$LIB"
 
 # Default settings
 # shellcheck disable=SC2034
-VERSION="1.1.1"
+VERSION="1.1.2"
 TARGET=""
 COUNT=5
 DRYRUN="false"
@@ -21,6 +21,8 @@ LIST="false"
 LATEST="false"
 PRUNE="false"
 RECOVER="false"
+RESTORE_OLDEST="false"
+RESTORE_LATEST="false"
 
 # --- Help ---
 show_help() {
@@ -30,14 +32,17 @@ show_help() {
   echo "  $0 --target ./your_folder [--dryrun]"
   echo
   echo "Options:"
-  echo "  --target    Folder to backup (required)"
-  echo "  --list      List backups for a target folder"
-  echo "  --latest    Show only the most recent backup"
-  echo "  --prune     Remove old backups (default: false)"
-  echo "  --restore   Restore from a backup archive (e.g., ./backups/your_folder/backup_20231001.tar.gz)"
-  echo "  --count     How many recent backups to retain (default: 5)"
-  echo "  --dryrun    Simulate, don’t create backup"
-  echo "  --help      Show this help"
+  echo "  --target          Folder to backup (required)"
+  echo "  --list            List backups for a target folder"
+  echo "  --latest          Show only the most recent backup"
+  echo "  --prune           Remove old backups (default: false)"
+  echo "  --restore         Restore from a backup archive (e.g., ./backups/your_folder/backup_20231001.tar.gz)"
+  echo "  --restore-latest  Restore most recent backup"
+  echo "  --restore-oldest  Restore oldest available backup"
+  echo "  --recover         Recover backup and overwrite folder"
+  echo "  --count           How many recent backups to retain (default: 5)"
+  echo "  --dryrun          Simulate, don’t create backup"
+  echo "  --help            Show this help"
   echo
   echo "Example:"
   echo "  $0 --target ./medium_bash"
@@ -53,6 +58,18 @@ while [[ $# -gt 0 ]]; do
   --restore)
     RESTORE="${2:-}"
     shift 2
+    ;;
+  --restore-oldest)
+    RESTORE_OLDEST="true"
+    shift
+    ;;
+  --restore-latest)
+    RESTORE_LATEST="true"
+    shift
+    ;;
+  --recover)
+    RECOVER="true"
+    shift
     ;;
   --list)
     LIST="true"
@@ -175,6 +192,43 @@ if [[ -n "${RESTORE:-}" ]]; then
   exit 0
 fi
 
+if [[ "$RESTORE_LATEST" == "true" ]]; then
+  selected_file=$(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null | head -n 1)
+  label="latest"
+elif [[ "$RESTORE_OLDEST" == "true" ]]; then
+  selected_file=$(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -tr 2>/dev/null | head -n 1)
+
+  # selected_file=$(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls 2>/dev/null | tail -n 1)
+  label="oldest"
+fi
+
+if [[ -z "$selected_file" ]]; then
+  echo "❌ No backups found in $BACKUP_DIR"
+  exit 1
+fi
+
+BASE_DIR="$(dirname "$selected_file")"
+BASE_NAME="$(basename "$selected_file" .tar.gz)"
+DEST="$BASE_DIR/$BASE_NAME"
+
+echo "📦 Restoring $label: $selected_file"
+mkdir -p "$DEST"
+tar -xzf "$selected_file" -C "$DEST"
+echo "✅ Archive restored to: $DEST"
+exit 0
+
+if [[ "$RECOVER" == "true" ]]; then
+  mapfile -t all_backups < <(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null)
+  if [[ ${#all_backups[@]} -eq 0 ]]; then
+    echo "❌ No backups found to recover from in $BACKUP_DIR"
+    exit 1
+  fi
+
+  LATEST_FILE="${all_backups[0]}"
+  recover_backup "$BACKUP_DIR" "$LATEST_FILE" "$TARGET" "$DRYRUN"
+  exit 0
+fi
+
 # --- Ensure required directories exist ---
 ensure_dirs_exist() {
   local dirs=("$@")
@@ -224,7 +278,8 @@ radar_backup_create "$TARGET" "$BACKUP_DIR" "$MDLOG" "$TPL" "$COUNT" "$DRYRUN" "
 # --- Prune old backups after creation (respect --count) ---
 # --- Prune old backups after creation (respect --count) ---
 # all_backups=($(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null))
-mapfile -t all_backups < <(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null)
+# mapfile -t all_backups < <(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null)
+mapfile -d '' -t all_backups < <(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | sort -rz)
 if ((${#all_backups[@]} > COUNT)); then
   to_delete=("${all_backups[@]:COUNT}")
   echo "🧹 Pruning old backups: keeping latest $COUNT, removing ${#to_delete[@]}..."

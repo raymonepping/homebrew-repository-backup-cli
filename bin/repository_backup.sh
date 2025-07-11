@@ -13,7 +13,7 @@ source "$LIB"
 
 # Default settings
 # shellcheck disable=SC2034
-VERSION="1.3.0"
+VERSION="1.5.0"
 TARGET=""
 COUNT=5
 DRYRUN="false"

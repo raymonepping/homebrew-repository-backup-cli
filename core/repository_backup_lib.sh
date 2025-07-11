@@ -2,7 +2,7 @@
 # --- radar_backup_lib.sh ---
 # Modular backup/restore/prune/summary logic for Radar Love (and friends)
 # shellcheck disable=SC2034
-VERSION="1.2.0"
+VERSION="1.3.0"
 
 QUIET="${QUIET:-false}"
 
@@ -27,15 +27,19 @@ backup_log() {
   [[ $QUIET == "true" ]] && return
   echo "${color_blue}[backup]${color_reset} $*"
 }
+
 backup_ok() {
   [[ $QUIET == "true" ]] && return
   echo "${color_green}${icon_ok} $*${color_reset}"
 }
+
 backup_warn() {
   [[ $QUIET == "true" ]] && return
   echo "${color_yellow}${icon_warn} $*${color_reset}"
 }
+
 backup_err() { echo "${color_red}${icon_err} $*${color_reset}" >&2; }
+
 backup_info() {
   [[ $QUIET == "true" ]] && return
   echo "${color_bold}${icon_info} $*${color_reset}"
@@ -112,9 +116,6 @@ create_backup_archive() {
   done
 
   local include_args=()
-  #  for inc in "${includes[@]}"; do
-  #    [[ -e "$root/$inc" ]] && include_args+=("$inc")
-  #  done
   for inc in "${includes[@]}"; do
     matches=()
     while IFS= read -r -d '' match; do
@@ -248,52 +249,60 @@ restore_backup() {
 recover_backup() {
   local backup_dir="$1" file="$2" root="$3" dryrun="${4:-false}"
   local full_path="$file"
+
   if [[ ! "$file" = /* ]] && [[ ! "$file" == ./* ]] && [[ ! "$file" == ../* ]]; then
     full_path="$backup_dir/$file"
   fi
 
   if [[ ! -f "$full_path" ]]; then
-    backup_err "Backup file not found: $full_path"
+    backup_err "❌ Backup file not found: $full_path"
     return 1
   fi
 
   if [[ "$dryrun" == "true" ]]; then
-    backup_warn "Dryrun: would recover $full_path into $root (files would be overwritten!)"
+    backup_info "ℹ️ [Dryrun] Would extract archive into: $root"
+    backup_info "🗂️ Contents of archive:"
+    tar -tzf "$full_path" | sed 's/^/ - /'
+    backup_warn "⚠️ [Dryrun] No files were overwritten or modified."
     return 0
   fi
 
   read -rp "⚠️  This will OVERWRITE files in $root. Continue? (y/N): " ans
   [[ "$ans" =~ ^[Yy]$ ]] || {
-    backup_warn "Aborted"
+    backup_warn "❌ Aborted by user."
     return 1
   }
 
   tar xzf "$full_path" -C "$root"
   backup_ok "✅ Restored $(basename "$full_path") into $(basename "$root")"
-  # backup_ok "Backup $(basename "$full_path") recovered into $root"
 }
 
 prune_backups() {
-  local backup_dir="$1" N="$2" dryrun="${3:-false}"
+  local backup_dir="$1"
+  local N="$2"
+  local dryrun="${3:-false}"
+
   local files
-  # files=($(ls -1t "$backup_dir"/*.tar.gz 2>/dev/null))
   mapfile -t files < <(ls -1t "$backup_dir"/*.tar.gz 2>/dev/null)
+
   if ((${#files[@]} <= N)); then
-    backup_info "Nothing to prune (total: ${#files[@]} <= $N)"
+    backup_info "✅ No pruning needed: total backups = ${#files[@]}, within limit ($N)."
     return
   fi
+
   for i in "${files[@]:$N}"; do
     if [[ "$dryrun" == "true" ]]; then
-      backup_warn "Dryrun: would prune $i"
+      backup_warn "⚠️ Dryrun: would prune $i"
     else
       rm -f "$i"
-      backup_warn "Pruned $i"
+      backup_warn "🗑️ Pruned $i"
     fi
   done
+
   if [[ "$dryrun" == "true" ]]; then
-    backup_warn "Dryrun: would keep $N most recent backups (no files deleted)."
+    backup_warn "⚠️ Dryrun: would keep $N most recent backups (no files deleted)."
   else
-    backup_ok "Prune complete. $N most recent backups kept."
+    backup_ok "✅ Prune complete. $N most recent backups kept."
   fi
 }
 
@@ -351,46 +360,108 @@ log_restore_summary() {
   echo "✅ Restored $(basename "$archive") into folder $dest" >>"$tpl"
 }
 
+# perform_emergency_restore() {
+perform_emergency_restore() {
+  local target_dir="$1"
+  local dryrun="${2:-false}"
+
+  local latest_tag
+  latest_tag=$(git -C "$target_dir" describe --tags --abbrev=0)
+
+  backup_info "🆘 Emergency Restore: reverting tracked files in '$target_dir' to tag: $latest_tag"
+
+  # Get restore file list from tag
+  local restore_files=()
+  while IFS= read -r file; do
+    restore_files+=("$file")
+  done < <(git -C "$target_dir" ls-tree -r --name-only "$latest_tag")
+
+  echo "🔍 Files that would be restored:"
+  printf " - %s\n" "${restore_files[@]}"
+
+  if [[ "$dryrun" == "true" ]]; then
+    backup_info "ℹ️ 🧪 [Dryrun] Simulation mode enabled."
+    backup_warn "⚠️ [Dryrun] Skipping confirmation and restore — no changes applied."
+    backup_ok "✅ [Dryrun] Emergency restore simulation complete from tag: $latest_tag"
+    return 0
+  fi
+
+  # Confirm with user
+  read -rp "⚠️ This will overwrite any changes. Continue? [y/N]: " confirm
+  [[ "$confirm" =~ ^[Yy]$ ]] || {
+    backup_warn "❌ Aborted by user."
+    exit 1
+  }
+
+  read -rp "Proceed with restoring these files? [y/N]: " confirm_files
+  [[ "$confirm_files" =~ ^[Yy]$ ]] || {
+    backup_warn "❌ Restore cancelled."
+    exit 1
+  }
+
+  (
+    cd "$target_dir" || exit 1
+    git restore --source="$latest_tag" --staged --worktree -- "${restore_files[@]}"
+  )
+
+  backup_ok "✅ Emergency restore completed from tag: $latest_tag"
+}
+
 restore_backup_with_diff() {
   local archive="$1"
   local target_dir="$2"
   local tpl_path="$3"
-  local force="${4:-false}"  # <-- pick up force from CLI
+  local force="${4:-false}"
+  local dryrun="${5:-false}"
 
-  local base_name
+  local base_name restore_path fresh_extract
   base_name="$(basename "$archive" .tar.gz)"
-  local restore_path="./${target_dir}/${base_name}"
+  restore_path="./${target_dir}/${base_name}"
+  fresh_extract=true
 
-  local fresh_extract=true
-
+  # Step 1: Handle restore path
   if [[ -d "$restore_path" ]]; then
     if [[ "$force" == "true" ]]; then
-      backup_warn "🚨 Force overwrite enabled — removing existing folder: $restore_path"
-      rm -rf "$restore_path"
-      mkdir -p "$restore_path"
-      tar -xzf "$archive" -C "$restore_path"
-      backup_info "📦 Force-extracted archive to: $restore_path"
+      if [[ "$dryrun" == "true" ]]; then
+        backup_warn "🚨 [Dryrun] Would remove existing folder: $restore_path"
+        backup_info "📦 [Dryrun] Would extract archive to: $restore_path"
+      else
+        backup_warn "🚨 Force overwrite enabled — removing existing folder: $restore_path"
+        rm -rf "$restore_path"
+        mkdir -p "$restore_path"
+        tar -xzf "$archive" -C "$restore_path"
+        backup_info "📦 Force-extracted archive to: $restore_path"
+      fi
     else
       backup_warn "⚠️  Skipping overwrite of $restore_path — verifying integrity instead"
       fresh_extract=false
     fi
   else
-    mkdir -p "$restore_path"
-    tar -xzf "$archive" -C "$restore_path"
-    backup_info "📦 Extracted archive to: $restore_path"
+    if [[ "$dryrun" == "true" ]]; then
+      backup_info "📦 [Dryrun] Would create and extract to: $restore_path"
+    else
+      mkdir -p "$restore_path"
+      tar -xzf "$archive" -C "$restore_path"
+      backup_info "📦 Extracted archive to: $restore_path"
+    fi
   fi
 
-  # Step 2: Extract original archive to temp dir for comparison
-  local temp_extract
+  # Step 2: Short-circuit on dryrun
+  if [[ "$dryrun" == "true" ]]; then
+    backup_info "🔍 [Dryrun] Skipping integrity check — archive not extracted"
+    return 0
+  fi
+
+  # Step 3: Extract original archive to temp dir for comparison
+  local temp_extract diff_output
   temp_extract=$(mktemp -d)
   tar -xzf "$archive" -C "$temp_extract"
 
-  # Step 3: Perform content-based diff, excluding noise
-  local diff_output
+  # Step 4: Perform content-based diff, excluding noise
   diff_output=$(diff -qr "$restore_path" "$temp_extract" | grep -vE '\.DS_Store|__MACOSX')
 
   if [[ -z "$diff_output" ]]; then
-    echo "🔒 Integrity successfully validated — archive matches expected contents."
+    backup_ok "🔒 Integrity successfully validated — archive matches expected contents."
     log_restore_summary "$archive" "$restore_path" "$tpl_path"
     log_restore_entry "diff" "$archive" "$restore_path" "$target_dir" "$MDLOG" "$tpl_path"
   else
@@ -399,9 +470,10 @@ restore_backup_with_diff() {
     echo "❌ Restored $(basename "$archive") into folder $restore_path — content mismatch!" >> "$tpl_path"
   fi
 
-  # Step 4: Clean up
+  # Step 5: Cleanup
   rm -rf "$temp_extract"
 
+  # Step 6: Final result log
   if [[ "$fresh_extract" == true || "$force" == "true" ]]; then
     backup_ok "✅ Archive restored to: $restore_path"
   else
@@ -409,58 +481,9 @@ restore_backup_with_diff() {
   fi
 }
 
-
-# remove
-restore_backup_with_checksum() {
-  local archive="$1"
-  local target_dir="$2"
-  local tpl_path="$3"
-
-  local base_name
-  base_name="$(basename "$archive" .tar.gz)"
-  local restore_path="./${target_dir}/${base_name}"
-
-  mkdir -p "$restore_path"
-  # tar -xzf "$archive" -C "$restore_path"
-  # Step 1: Use existing restored folder if it already exists
-  if [[ ! -d "$restore_path" ]]; then
-    tar -xzf "$archive" -C "$restore_path"
-  else
-    backup_warn "⚠️  Skipping overwrite of $restore_path — verifying integrity instead"
-  fi
-
-
-  # Compute original MD5
-  local original_md5
-  original_md5=$(md5sum "$archive" | awk '{print $1}')
-
-  # Repack restored files to temp archive
-  local temp_tar="./${target_dir}/${base_name}_temp.tar.gz"
-  tar -czf "$temp_tar" -C "$restore_path" .
-
-  # Compute restored MD5
-  local restored_md5
-  restored_md5=$(md5sum "$temp_tar" | awk '{print $1}')
-
-  # Cleanup
-  rm -f "$temp_tar"
-
-  # Compare checksums
-  if [[ "$original_md5" == "$restored_md5" ]]; then
-    echo "✅ Archive restored to: $restore_path"
-    log_restore_summary "$archive" "$restore_path" "$tpl_path"
-  else
-    echo "❌ Archive restored to: $restore_path — but checksum mismatch!"
-    echo "❌ Restored $(basename "$archive") into folder $restore_path — checksum mismatch!" >>"$tpl_path"
-  fi
-
-  echo "✅ Archive restored to: $restore_path"
-}
-
 # --- CLI exposed entrypoints ---
-# radar_backup_create() { backup_project "$1" "$2" "$3" "$4" "$5" "$6" "${7:-}"; }
 radar_backup_create() { backup_project "$@"; }
-radar_backup_restore() { restore_backup "$3" "$1" "$2"; }
-radar_backup_recover() { recover_backup "$3" "$1" "$2"; }
-radar_backup_prune() { prune_backups "$1" "$2"; }
-radar_backup_summary() { get_last_n_backups "$1" "$2"; }
+radar_backup_restore()  { restore_backup_with_diff "$3" "$1" "$2" "$4" "$5"; }
+radar_backup_recover()  { recover_backup "$3" "$1" "$2" "$4" "$5"; }
+radar_backup_prune()    { prune_backups "$1" "$2" "$3"; }
+radar_backup_summary()  { get_last_n_backups "$1" "$2"; }

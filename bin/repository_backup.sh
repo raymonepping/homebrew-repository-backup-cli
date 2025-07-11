@@ -13,7 +13,7 @@ source "$LIB"
 
 # Default settings
 # shellcheck disable=SC2034
-VERSION="1.2.0"
+VERSION="1.3.0"
 TARGET=""
 COUNT=5
 DRYRUN="false"
@@ -24,30 +24,32 @@ RECOVER="false"
 RESTORE_OLDEST="false"
 RESTORE_LATEST="false"
 FORCE=false
+EMERGENCY_RESTORE="false"
 
 # --- Help ---
 show_help() {
   echo "📦 repository_backup.sh (v$VERSION)"
-  echo
-  echo "Usage:"
-  echo "  $0 --target ./your_folder [--dryrun]"
-  echo
-  echo "Options:"
-  echo "  --target          Folder to backup (required)"
-  echo "  --list            List backups for a target folder"
-  echo "  --latest          Show only the most recent backup"
-  echo "  --prune           Remove old backups (default: false)"
-  echo "  --restore         Restore from a backup archive (e.g., ./backups/your_folder/backup_20231001.tar.gz)"
-  echo "  --restore-latest  Restore most recent backup"
-  echo "  --restore-oldest  Restore oldest available backup"
-  echo "  --recover         Recover backup and overwrite folder"
-  echo "  --count           How many recent backups to retain (default: 5)"
-  echo "  --dryrun          Simulate, don’t create backup"
-  echo "  --force           Force overwrite of existing restore folder"
-  echo "  --help            Show this help"
-  echo
-  echo "Example:"
-  echo "  $0 --target ./medium_bash"
+echo
+echo "Usage:"
+echo "  $0 --target ./your_folder [--dryrun]"
+echo
+echo "Options:"
+echo "  --target            Folder to backup (required)"
+echo "  --list              List backups for a target folder              [dryrun supported]"
+echo "  --latest            Show only the most recent backup              [dryrun supported]"
+echo "  --prune             Remove old backups (default: false)           [dryrun supported]"
+echo "  --restore           Restore from a backup archive                 [dryrun supported]"
+echo "  --restore-latest    Restore most recent backup                    [dryrun supported]"
+echo "  --restore-oldest    Restore oldest available backup               [dryrun supported]"
+echo "  --recover           Recover backup and overwrite folder           [dryrun supported]"
+echo "  --emergency-restore Restore tracked files from latest Git tag     [dryrun supported]"
+echo "  --count             How many recent backups to retain (default: 5)"
+echo "  --dryrun            Simulate, don’t create or modify anything"
+echo "  --force             Force overwrite of existing restore folder"
+echo "  --help              Show this help"
+echo
+echo "Example:"
+echo "  $0 --target ./medium_bash --restore-latest --dryrun"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -74,6 +76,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --recover)
       RECOVER=true
+      shift
+      ;;
+    --emergency-restore)
+      EMERGENCY_RESTORE="true"
       shift
       ;;
     --list)
@@ -130,17 +136,7 @@ MDLOG="$CATALOG_DIR/backup_log.md"
 TPL="$SCRIPT_DIR/../core/backup_log.tpl"
 
 if [[ "$PRUNE" == "true" ]]; then
-  all_backups=($(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null))
-  if (( ${#all_backups[@]} > COUNT )); then
-    to_delete=("${all_backups[@]:COUNT}")
-    echo "🧹 Pruning backups: keeping $COUNT, removing ${#to_delete[@]}"
-    for file in "${to_delete[@]}"; do
-      echo "🗑️  $(basename "$file")"
-      rm -f "$file"
-    done
-  else
-    echo "✅ No backups to prune."
-  fi
+  radar_backup_prune "$BACKUP_DIR" "$COUNT" "$DRYRUN"
   exit 0
 fi
 
@@ -183,7 +179,9 @@ if [[ -n "${RESTORE:-}" ]]; then
   fi
 
   echo "📦 Restoring from: $RESTORE"
-  restore_backup_with_diff "$RESTORE" "$(dirname "$RESTORE")" "$TPL" "$FORCE"
+  restore_backup_with_diff "$RESTORE" "$(dirname "$RESTORE")" "$TPL" "$FORCE" "$DRYRUN"
+
+  # restore_backup_with_diff "$RESTORE" "$(dirname "$RESTORE")" "$TPL" "$FORCE"
   exit 0
 fi
 
@@ -260,6 +258,7 @@ ensure_git_tag "$TARGET"
 # --- Run backup ---
 radar_backup_create "$TARGET" "$BACKUP_DIR" "$MDLOG" "$TPL" "$COUNT" "$DRYRUN" "$CONFIG_FILE"
 
+
 # --- Prune old backups after creation (respect --count) ---
 mapfile -d '' -t all_backups < <(find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | sort -rz)
 if (( ${#all_backups[@]} > COUNT )); then
@@ -271,4 +270,9 @@ if (( ${#all_backups[@]} > COUNT )); then
   done
 else
   echo "✅ No pruning needed: total backups = ${#all_backups[@]}, within limit ($COUNT)."
+fi
+
+if [[ "$EMERGENCY_RESTORE" == "true" ]]; then
+  perform_emergency_restore "$TARGET"
+  exit 0
 fi

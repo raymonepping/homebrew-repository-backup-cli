@@ -14,29 +14,39 @@
 
 ---
 
-## 🔍 Exclusions (from `.backupignore` / config):
+<details>
+<summary>🔍 Exclusions (from `.backupignore` / config)</summary>
 
+```
 {{EXCLUSIONS}}
+```
+</details>
 
 ---
 
-## ✅ Integrity Check Results
+<details>
+<summary>✅ Integrity Check Results</summary>
 
+```
 {{INTEGRITY}}
+```
+</details>
 
 ---
 
-*Backups are stored in `backup/` for quick restore. To recover, use `./radar_backup.sh --restore <filename>`.*
+### 🔁 Restore & Prune Options
+
+- 🔙 Basic restore: `./radar_backup.sh --restore <filename>`
+- 🩹 Overwrite original: `./radar_backup.sh --recover`
+- 🚨 Emergency tag restore: `./radar_backup.sh --emergency`
+- 🧹 Manual prune: `./radar_backup.sh --prune --count <number>`
 
 ---
+
 Variables explained:
 
-{{LAST_BACKUP}}: Latest backup tag
-
-{{MAX_SUMMARY}}: Number of summary rows to show (e.g. 5)
-
-{{SUMMARY_ROWS}}: Table rows with last backups info
-
-{{EXCLUSIONS}}: Text block with patterns
-
-{{INTEGRITY}}: Markdown/text block (passed/failed, hash check, etc)
+- `{{LAST_BACKUP}}`: Latest backup tag
+- `{{MAX_SUMMARY}}`: Number of summary rows to show (e.g. 5)
+- `{{SUMMARY_ROWS}}`: Table rows with last backups info
+- `{{EXCLUSIONS}}`: Text block with patterns
+- `{{INTEGRITY}}`: Markdown/text block (passed/failed, hash check, etc)

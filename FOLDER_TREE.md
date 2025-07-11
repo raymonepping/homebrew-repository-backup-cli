@@ -1,4 +1,4 @@
-## 📁 Folder Tree - 2025-07-11 13:13:39 ##
+## 📁 Folder Tree - 2025-07-11 13:45:15 ##
 
 [![Folder Tree](https://img.shields.io/badge/folder--tree-generated-blue?logo=tree&style=flat-square)](./FOLDER_TREE.md)
 [![Folder Tree Version](https://img.shields.io/badge/folder--tree-v1.5.6-purple?style=flat-square)](./FOLDER_TREE.md)
@@ -26,10 +26,12 @@
 │   └── .keep
 ├── .backupignore
 ├── .brewinfo
+├── FOLDER_TREE.md
 ├── LICENSE
 ├── README.md
+├── sanity_check.md
 └── update_formula.sh*
 
-5 directories, 20 files
+5 directories, 22 files
 
 ---

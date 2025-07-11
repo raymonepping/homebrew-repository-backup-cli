@@ -1,0 +1,14 @@
+{
+  "include": [
+    "LICENSE",
+    "README.md",
+    "bin/*.sh",
+    "core/*.sh",
+    "core/*.tpl",
+    "core/*.json",
+    "core/*.md"
+  ],
+  "exclude": [
+    "github/*"
+  ]
+}

@@ -2,7 +2,9 @@
 # --- radar_backup_lib.sh ---
 # Modular backup/restore/prune/summary logic for Radar Love (and friends)
 # shellcheck disable=SC2034
-VERSION="1.0.1"
+VERSION="1.0.2"
+
+QUIET="${QUIET:-false}"
 
 # --- COLORS & ICONS ---
 color_reset=$'\e[0m'
@@ -37,6 +39,30 @@ backup_err() { echo "${color_red}${icon_err} $*${color_reset}" >&2; }
 backup_info() {
   [[ $QUIET == "true" ]] && return
   echo "${color_bold}${icon_info} $*${color_reset}"
+}
+
+# --- Git tag helpers ---
+get_git_tag_info() {
+  local root="$1"
+  cd "$root" || return 1
+  local tag commit parent
+  tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "untagged")
+  commit=$(git rev-parse HEAD)
+  parent=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "none")
+  echo "$tag" "$commit" "$parent"
+}
+
+ensure_git_tag() {
+  local dir="$1"
+  if [[ ! -d "$dir/.git" ]]; then return 0; fi
+  if git -C "$dir" rev-parse --is-inside-work-tree &>/dev/null; then
+    local tags
+    tags=$(git -C "$dir" tag)
+    if [[ -z "$tags" ]]; then
+      backup_warn "No Git tags found in $dir. Creating initial tag: v0.1.0"
+      git -C "$dir" tag v0.1.0
+    fi
+  fi
 }
 
 # --- Get includes/excludes as newline blobs (no declare) ---
@@ -86,8 +112,16 @@ create_backup_archive() {
   done
 
   local include_args=()
+  #  for inc in "${includes[@]}"; do
+  #    [[ -e "$root/$inc" ]] && include_args+=("$inc")
+  #  done
   for inc in "${includes[@]}"; do
-    [[ -e "$root/$inc" ]] && include_args+=("$inc")
+    matches=()
+    while IFS= read -r -d '' match; do
+      matches+=("${match#"$root"/}")
+      # matches+=("${match#$root/}")
+    done < <(find "$root" -path "$root/$inc" -print0 2>/dev/null || true)
+    include_args+=("${matches[@]}")
   done
 
   backup_log "Tar include args: ${include_args[*]}" >&2
@@ -103,22 +137,36 @@ create_backup_archive() {
     return 0
   fi
 
-  (cd "$root" && tar czf "$backup_dir/$archive_name" "${exclude_args[@]}" "${include_args[@]}")
+  # (cd "$root" && tar czf "$backup_dir/$archive_name" "${exclude_args[@]}" "${include_args[@]}")
+  local abs_backup_path
+  abs_backup_path="$(cd "$backup_dir" && pwd)/$archive_name"
+  (cd "$root" && tar czf "$abs_backup_path" "${exclude_args[@]}" "${include_args[@]}")
+
   echo "$archive_name"
 }
 
 # --- Main backup logic (only uses blobs) ---
 backup_project() {
-  local root="$1" backup_dir="$2" mdlog="$3" tpl="$4" N="$5" dryrun="${6:-false}" config_file="$7"
+  local root="$1" backup_dir="$2" mdlog="$3" tpl="$4" N="$5" dryrun="${6:-false}" config_file="${7:-}"
+
   mkdir -p "$backup_dir"
+
+  # Inject here:
+  ensure_git_tag "$root"
 
   local arr_blobs includes_blob excludes_blob
 
   # if ! arr_blobs=$(get_backup_config_blobs "$root"); then
-  if ! arr_blobs=$(get_backup_config_blobs "$config_file"); then
-    backup_err "Skipping backup for $root due to config errors."
+  if [[ -z "$config_file" ]]; then
+    backup_err "No config file provided to backup_project"
     return 1
   fi
+
+  if ! arr_blobs=$(get_backup_config_blobs "$config_file"); then
+    backup_err "Failed to read includes/excludes from $config_file"
+    return 1
+  fi
+
   includes_blob=$(awk '/^---END---/ {exit} {print}' <<<"$arr_blobs")
   excludes_blob=$(awk 'flag {print} /^---END---/ {flag=1}' <<<"$arr_blobs")
 
@@ -249,15 +297,6 @@ prune_backups() {
 }
 
 # --- Git tag helpers ---
-get_git_tag_info() {
-  local root="$1"
-  cd "$root" || return 1
-  local tag commit parent
-  tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "untagged")
-  commit=$(git rev-parse HEAD)
-  parent=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "none")
-  echo "$tag" "$commit" "$parent"
-}
 
 get_sha256() {
   local file="$1"
@@ -304,8 +343,9 @@ write_log_md_from_tpl() {
 }
 
 # --- CLI exposed entrypoints ---
-radar_backup_create() { backup_project "$1" "$2" "$3" "$4" "$5" "$dryrun" "$7"; }
-radar_backup_restore() { restore_backup "$3" "$1" "$2" "$dryrun"; }
-radar_backup_recover() { recover_backup "$3" "$1" "$2" "$dryrun"; }
-radar_backup_prune() { prune_backups "$1" "$2" "$dryrun"; }
+# radar_backup_create() { backup_project "$1" "$2" "$3" "$4" "$5" "$6" "${7:-}"; }
+radar_backup_create() { backup_project "$@"; }
+radar_backup_restore() { restore_backup "$3" "$1" "$2"; }
+radar_backup_recover() { recover_backup "$3" "$1" "$2"; }
+radar_backup_prune() { prune_backups "$1" "$2"; }
 radar_backup_summary() { get_last_n_backups "$1" "$2"; }

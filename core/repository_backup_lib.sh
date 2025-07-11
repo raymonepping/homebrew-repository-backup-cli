@@ -21,17 +21,30 @@ icon_restore="💾"
 icon_prune="🧹"
 icon_info="ℹ️"
 
-backup_log()   { [[ $QUIET == "true" ]] && return; echo "${color_blue}[backup]${color_reset} $*"; }
-backup_ok()    { [[ $QUIET == "true" ]] && return; echo "${color_green}${icon_ok} $*${color_reset}"; }
-backup_warn()  { [[ $QUIET == "true" ]] && return; echo "${color_yellow}${icon_warn} $*${color_reset}"; }
-backup_err()   { echo "${color_red}${icon_err} $*${color_reset}" >&2; }
-backup_info()  { [[ $QUIET == "true" ]] && return; echo "${color_bold}${icon_info} $*${color_reset}"; }
+backup_log() {
+  [[ $QUIET == "true" ]] && return
+  echo "${color_blue}[backup]${color_reset} $*"
+}
+backup_ok() {
+  [[ $QUIET == "true" ]] && return
+  echo "${color_green}${icon_ok} $*${color_reset}"
+}
+backup_warn() {
+  [[ $QUIET == "true" ]] && return
+  echo "${color_yellow}${icon_warn} $*${color_reset}"
+}
+backup_err() { echo "${color_red}${icon_err} $*${color_reset}" >&2; }
+backup_info() {
+  [[ $QUIET == "true" ]] && return
+  echo "${color_bold}${icon_info} $*${color_reset}"
+}
 
 # --- Get includes/excludes as newline blobs (no declare) ---
 get_backup_config_blobs() {
-  
+
   local config_file="$1"
-  local ignore_file="$(dirname "$config_file")/.backupignore"
+  # local ignore_file="$(dirname "$config_file")/.backupignore"
+  ignore_file="$(dirname "$config_file")"
 
   local includes=() excludes=()
   if [[ -f "$config_file" ]]; then
@@ -149,11 +162,11 @@ backup_project() {
   exclusions_file=$(mktemp)
   integrity_file=$(mktemp)
 
-  get_last_n_backups "$mdlog" "$N" > "$summary_file"
-  printf '%s\n' "${excludes_arr[@]}" > "$exclusions_file"
+  get_last_n_backups "$mdlog" "$N" >"$summary_file"
+  printf '%s\n' "${excludes_arr[@]}" >"$exclusions_file"
 
   # Replace this with a real integrity check if desired
-  echo "All backup SHA256 checks: OK" > "$integrity_file"
+  echo "All backup SHA256 checks: OK" >"$integrity_file"
 
   write_log_md_from_tpl "$tpl" "$out" "$summary_file" "$last_backup" "$max_summary" "$exclusions_file" "$integrity_file"
 
@@ -172,7 +185,9 @@ restore_backup() {
     return 1
   fi
 
-  local restore_dir="$root/restore_$(date +%Y%m%d_%H%M%S)"
+  # local restore_dir="$root/restore_$(date +%Y%m%d_%H%M%S)"
+  restore_dir="$root/restore_$(date +%Y%m%d_%H%M%S)"
+
   if [[ "$dryrun" == "true" ]]; then
     backup_warn "Dryrun: would restore $full_path to $restore_dir (no files written)"
     return 0
@@ -200,7 +215,10 @@ recover_backup() {
   fi
 
   read -rp "⚠️  This will OVERWRITE files in $root. Continue? (y/N): " ans
-  [[ "$ans" =~ ^[Yy]$ ]] || { backup_warn "Aborted"; return 1; }
+  [[ "$ans" =~ ^[Yy]$ ]] || {
+    backup_warn "Aborted"
+    return 1
+  }
 
   tar xzf "$full_path" -C "$root"
   backup_ok "Backup $(basename "$full_path") recovered into $root"
@@ -209,7 +227,8 @@ recover_backup() {
 prune_backups() {
   local backup_dir="$1" N="$2" dryrun="${3:-false}"
   local files
-  files=($(ls -1t "$backup_dir"/*.tar.gz 2>/dev/null))
+  # files=($(ls -1t "$backup_dir"/*.tar.gz 2>/dev/null))
+  mapfile -t files < <(ls -1t "$backup_dir"/*.tar.gz 2>/dev/null)
   if ((${#files[@]} <= N)); then
     backup_info "Nothing to prune (total: ${#files[@]} <= $N)"
     return
@@ -281,12 +300,12 @@ write_log_md_from_tpl() {
           s/{{INTEGRITY}}//g
           r $integrity_file
        }" \
-    > "$out"
+    >"$out"
 }
 
 # --- CLI exposed entrypoints ---
-radar_backup_create()   { backup_project "$1" "$2" "$3" "$4" "$5" "$DRYRUN" "$7";}; 
-radar_backup_restore()  { restore_backup "$3" "$1" "$2" "$DRYRUN"; }
-radar_backup_recover()  { recover_backup "$3" "$1" "$2" "$DRYRUN"; }
-radar_backup_prune()    { prune_backups "$1" "$2" "$DRYRUN"; }
-radar_backup_summary()  { get_last_n_backups "$1" "$2"; }
+radar_backup_create() { backup_project "$1" "$2" "$3" "$4" "$5" "$dryrun" "$7"; }
+radar_backup_restore() { restore_backup "$3" "$1" "$2" "$dryrun"; }
+radar_backup_recover() { recover_backup "$3" "$1" "$2" "$dryrun"; }
+radar_backup_prune() { prune_backups "$1" "$2" "$dryrun"; }
+radar_backup_summary() { get_last_n_backups "$1" "$2"; }

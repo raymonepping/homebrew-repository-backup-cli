@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Default settings
 # shellcheck disable=SC2034
-VERSION="1.5.0"
+VERSION="1.6.0"
 TARGET=""
 COUNT=5
 DRYRUN="false"

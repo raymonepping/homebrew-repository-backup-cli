@@ -22,8 +22,12 @@ EMERGENCY_RESTORE="false"
 SUMMARY="false"
 OUTPUT_FORMAT="plain"
 
+: "${REPO_BACKUP_HOME:=${REPO_BACKUP_HOME:-/opt/homebrew/opt/repository-backup-cli/share/repository-backup-cli}}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB="$SCRIPT_DIR/../core/repository_backup_lib.sh"
+LIB="$REPO_BACKUP_HOME/core/repository_backup_lib.sh"
+
+# LIB="$SCRIPT_DIR/../core/repository_backup_lib.sh"
 
 # shellcheck source=../core/repository_backup_lib.sh
 source "$LIB"

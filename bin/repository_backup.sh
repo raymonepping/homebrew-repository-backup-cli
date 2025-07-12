@@ -6,7 +6,9 @@
 set -euo pipefail
 
 # shellcheck disable=SC2034
-VERSION="1.3.0"
+SCRIPT_NAME="$(basename "$0")"
+# shellcheck disable=SC2034
+VERSION="1.3.1"
 
 # --- Core Target/Action ---
 TARGET=""
@@ -125,6 +127,10 @@ while [[ $# -gt 0 ]]; do
   --dryrun)
     DRYRUN=true
     shift
+    ;;
+  --version)
+    echo "📦 $SCRIPT_NAME (v$VERSION)"
+    exit 0
     ;;
   --help | -h)
     show_help

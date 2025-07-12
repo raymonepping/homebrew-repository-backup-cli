@@ -1,10 +1,10 @@
 class RepositoryBackupCli < Formula
   desc "Modular, dryrun-safe, self-healing backup CLI with integrity checks and Markdown summaries"
   homepage "https://github.com/raymonepping/repository_backup_cli"
-  url "https://github.com/raymonepping/repository_backup_cli/archive/refs/tags/v1.0.0.tar.gz"
+  url "https://github.com/raymonepping/repository_backup_cli/archive/refs/tags/v1.0.2.tar.gz"
   sha256 "0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5"
   license "MIT"
-  version "1.0.0"
+  version "1.0.2"
 
   depends_on "bash"
 

@@ -1,33 +1,36 @@
-class RadarLoveCli < Formula
-  desc "CLI toolkit for simulating secret leaks and triggering GitHub PR scans"
-  homepage "https://github.com/raymonepping/radar_love_cli"
-  url "https://github.com/raymonepping/homebrew-radar-love-cli/archive/refs/tags/v2.8.4.tar.gz"
-  sha256 "a17f2b73d6dcb8d859095fd8fe2638a9e41512a17548c4485139acd42bdd793b"
+class RepositoryBackupCli < Formula
+  desc "Modular, dryrun-safe, Git-aware backup CLI with config detection and markdown summary"
+  homepage "https://github.com/raymonepping/repository_backup_cli"
+  url "https://github.com/raymonepping/repository_backup_cli/archive/refs/tags/v1.0.0.tar.gz"
+  sha256 "<UPDATE_ME>" # Generated after pushing the release tarball
   license "MIT"
-  version "2.8.4"
+  version "1.0.0"
 
   depends_on "bash"
+  depends_on "coreutils" # for md5sum and other portable utils
+  depends_on "yq" => :optional
+  depends_on "hclq" => :optional
 
   def install
-    bin.install "bin/radar_love" => "radar_love"
-    pkgshare.install "core", "templates"
+    bin.install "bin/repository_backup.sh" => "repository_backup"
+    pkgshare.install "lib", "examples"
     doc.install "README.md"
   end
 
   def caveats
     <<~EOS
-      To get started, run:
-        radar_love --help
+      To get started:
+        repository_backup --help
 
-      The core scripts and templates are located in:
-        #{opt_pkgshare}
+      To use the backup library from scripts:
+        export REPOSITORY_BACKUP_HOME=#{opt_pkgshare}
 
-      If you need to reference them directly in your scripts, use:
-        export RADAR_LOVE_HOME=#{opt_pkgshare}
+      Examples and templates are in:
+        #{opt_pkgshare}/examples
     EOS
   end
 
   test do
-    assert_match "radar_love", shell_output("#{bin}/radar_love --version")
+    assert_match "repository_backup", shell_output("#{bin}/repository_backup --help")
   end
 end

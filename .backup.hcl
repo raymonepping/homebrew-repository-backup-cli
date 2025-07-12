@@ -1,2 +1,2 @@
-include = ["LICENSE", "README.md", "*.sh"]
-exclude = ["github/*"]
+include = ["**/*.sh", "core/*.sh", "*.md"]
+exclude = ["github/*", "test/*"]

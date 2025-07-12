@@ -63,3 +63,8 @@ Variables explained:
 ❌ Restored v0.1.0_20250711_200514.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_200514 — content mismatch!
 ❌ Restored v0.1.0_20250711_222026.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_222026 — content mismatch!
 ❌ Restored v0.1.0_20250711_222026.tar.gz into folder ././backups/medium_bash/v0.1.0_20250711_222026 — content mismatch!
+✅ Restored v0.1.0_20250711_235951.tar.gz into folder ./backups/medium_bash/v0.1.0_20250711_235951
+✅ Restored v0.1.0_20250712_185018.tar.gz into folder ./backups/medium_bash/v0.1.0_20250712_185018
+✅ Restored v0.1.0_20250712_185018.tar.gz into folder ./backups/medium_bash/v0.1.0_20250712_185018
+✅ Restored v0.1.0_20250712_185018.tar.gz into folder ./backups/medium_bash/v0.1.0_20250712_185018
+✅ Restored v0.1.0_20250711_235317.tar.gz into folder ./backups/medium_bash/v0.1.0_20250711_235317

@@ -5,40 +5,37 @@
 
 set -euo pipefail
 
-# shellcheck disable=SC2034
-SCRIPT_NAME="$(basename "$0")"
+# Default settings
 # shellcheck disable=SC2034
 VERSION="1.3.1"
 
 # --- Core Target/Action ---
-TARGET=""
-COUNT=5
+TARGET=""              # The directory/folder to backup or restore
+COUNT=5                # Number of recent backups to keep/list
 
 # --- Backup & Restore Modes ---
-DRYRUN="false"
-LIST="false"
-LATEST="false"
-PRUNE="false"
-RECOVER="false"
-RESTORE_OLDEST="false"
-RESTORE_LATEST="false"
-FORCE="false"
-EMERGENCY_RESTORE="false"
+DRYRUN="false"         # Simulate actions; don't write/delete files
+LIST="false"           # List available backups
+LATEST="false"         # Show only the latest backup file
+PRUNE="false"          # Prune old backups, retaining only $COUNT
+RECOVER="false"        # Recover (overwrite) an existing folder with a backup
+RESTORE_OLDEST="false" # Restore from the oldest backup
+RESTORE_LATEST="false" # Restore from the latest backup
+FORCE="false"          # Force overwrite during restore
+EMERGENCY_RESTORE="false" # Restore files from latest Git tag
 
 # --- Reporting/Output ---
-SUMMARY="false"
-OUTPUT_FORMAT="plain"
+SUMMARY="false"        # Show backup summary/markdown output
+OUTPUT_FORMAT="plain"  # Output format for summaries: plain | markdown | md
+
+# --- Developer/Debug ---
+DEBUG="false"          # Enable debug output and verbose logs
 
 : "${REPO_BACKUP_HOME:=${REPO_BACKUP_HOME:-/opt/homebrew/opt/repository-backup-cli/share/repository-backup-cli}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_BACKUP_HOME="${REPO_BACKUP_HOME:-/opt/homebrew/opt/repository-backup-cli/share/repository-backup-cli}"
 
-# Handle --version
-if [[ "${1:-}" == "--version" ]]; then
-  echo "$SCRIPT_NAME v$VERSION — auto-seeding secret scanning demos"
-  exit 0
-fi
 
 # --- Help ---
 show_help() {
@@ -63,13 +60,11 @@ show_help() {
   echo "  --dryrun            Simulate, don’t create or modify anything"
   echo "  --force             Force overwrite of existing restore folder"
   echo "  --help              Show this help"
-  echo "  --version           Show version information and exit"
   echo
   echo "Example:"
   echo "  $0 --target ./medium_bash --restore-latest --dryrun"
 }
 
-# ---- Parse arguments *before* sourcing lib or debug calls ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --target)
@@ -97,7 +92,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --emergency-restore)
-    EMERGENCY_RESTORE=true
+    EMERGENCY_RESTORE="true"
     shift
     ;;
   --list)
@@ -128,9 +123,9 @@ while [[ $# -gt 0 ]]; do
     DRYRUN=true
     shift
     ;;
-  --version)
-    echo "📦 $SCRIPT_NAME (v$VERSION)"
-    exit 0
+  --debug)
+    DEBUG=true
+    shift
     ;;
   --help | -h)
     show_help
@@ -144,7 +139,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Source lib after parsing (now DEBUG is set correctly!) ---
+# --- Debug Logging ---
+color_bold=$'\e[1m'
+color_reset=$'\e[0m'
+main_debug_log() { [[ "$DEBUG" == "true" ]] && echo -e "${color_bold}[debug]${color_reset} $*"; }
+
 if [[ -f "$SCRIPT_DIR/../core/repository_backup_lib.sh" ]]; then
   LIB="$SCRIPT_DIR/../core/repository_backup_lib.sh"
   MODE="LOCAL"
@@ -154,32 +153,7 @@ else
 fi
 source "$LIB"
 
-# Near the end of the script after parsing and sourcing
-if [[ "$RECOVER" == "true" ]]; then
-  BACKUP_DIR="./backups/$(basename "$TARGET")"
-  LATEST_FILE=$(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null | head -n 1)
-
-  if [[ -z "$LATEST_FILE" ]]; then
-    backup_err "❌ No backups found to recover from."
-    exit 1
-  fi
-
-  if [[ "$LIST" == "true" ]]; then
-    echo "📦 Recoverable backups for: $(basename "$TARGET")"
-    echo "-----------------------------------------------"
-    find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null | while read -r file; do
-      size=$(du -h "$file" | cut -f1)
-      printf "  - %-35s [%5s]\n" "$(basename "$file")" "$size"
-    done
-    exit 0
-  fi
-
-  backup_info "💾 Recovering from: $LATEST_FILE"
-  recover_backup "$BACKUP_DIR" "$LATEST_FILE" "$TARGET" "$DRYRUN" "$FORCE"
-  exit $?
-fi
-
-
+main_debug_log "🚨  Loaded library mode: $MODE (from $LIB)"
 
 # --- Validation ---
 if [[ -z "$TARGET" ]]; then
@@ -214,30 +188,7 @@ CATALOG_DIR="./backups/catalogs/$(basename "$TARGET")"
 # CONFIG_FILE="$TARGET/.backup.json"
 IGNORE_FILE="$TARGET/.backupignore"
 MDLOG="$CATALOG_DIR/backup_log.md"
-
-if [[ -f "$SCRIPT_DIR/../core/backup_log.tpl" ]]; then
-  # Local (from dev folder)
-  TPL="$SCRIPT_DIR/../core/backup_log.tpl"
-else
-  # Homebrew (from installed prefix)
-  TPL="$REPO_BACKUP_HOME/core/backup_log.tpl"
-fi
-
-
-# --- List Backups ---
-if [[ "$LIST" == "true" ]]; then
-  echo "📦 Backup List for: $(basename "$TARGET")"
-  echo "------------------------------------------"
-  echo "📂 Target: $(basename "$TARGET")"
-  total=$(find "$BACKUP_DIR" -name '*.tar.gz' 2>/dev/null | wc -l)
-  printf "📜 Found %2d backups (showing latest %s):\n" "$total" "$COUNT"
-  echo -e "\n🗃️  Backups:"
-  find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null | head -n "$COUNT" | while read -r file; do
-    size=$(du -h "$file" | cut -f1)
-    printf "  - %-35s [%5s]\n" "$(basename "$file")" "$size"
-  done
-  exit 0
-fi
+TPL="$SCRIPT_DIR/../core/backup_log.tpl"
 
 if [[ "$SUMMARY" == "true" ]]; then
   render_summary "$MDLOG" "$COUNT" "$OUTPUT_FORMAT"
@@ -246,6 +197,23 @@ fi
 
 if [[ "$PRUNE" == "true" ]]; then
   radar_backup_prune "$BACKUP_DIR" "$COUNT" "$DRYRUN"
+  exit 0
+fi
+
+# --- List backups ---
+if [[ "$LIST" == "true" ]]; then
+  echo "📦 Backup List for: $(basename "$TARGET")"
+  echo "------------------------------------------"
+  echo "📂 Target: $(basename "$TARGET")"
+  printf "📜 Found %2d backups (showing latest %s):\n" \
+    "$(ls "$BACKUP_DIR"/*.tar.gz 2>/dev/null | wc -l)" "$COUNT"
+  echo
+  echo "🗃️  Backups:"
+  find "$BACKUP_DIR" -maxdepth 1 -name '*.tar.gz' -print0 | xargs -0 ls -t 2>/dev/null | head -n "$COUNT" | while read -r file; do
+    size=$(du -h "$file" | cut -f1)
+    printf "  - %-35s [%5s]\n" "$(basename "$file")" "$size"
+  done
+
   exit 0
 fi
 

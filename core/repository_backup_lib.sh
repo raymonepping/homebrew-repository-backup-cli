@@ -2,7 +2,7 @@
 # --- radar_backup_lib.sh ---
 # Modular backup/restore/prune/summary logic for Radar Love (and friends)
 # shellcheck disable=SC2034
-VERSION="1.0.6"
+VERSION="1.3.1"
 
 QUIET="${QUIET:-false}"
 
@@ -82,12 +82,27 @@ ensure_git_tag() {
   fi
 }
 
+normalize_includes_blob() {
+  local blob="$1"
+  local includes_out=()
+  if [[ "$blob" =~ ^\[.*\]$ ]]; then
+    if command -v jq &>/dev/null; then
+      mapfile -t includes_out < <(echo "$blob" | jq -r '.[]')
+    else
+      echo "❌ jq is required to parse JSON arrays in includes_blob." >&2
+      return 1
+    fi
+  else
+    mapfile -t includes_out <<<"$blob"
+  fi
+  printf '%s\n' "${includes_out[@]}"
+}
+
 # --- Get includes/excludes as newline blobs (no declare) ---
 get_backup_config_blobs() {
   local config_file="$1"
   local ignore_file
   ignore_file="$(dirname "$config_file")/.backupignore"
-
   local includes=() excludes=()
 
   if [[ -f "$config_file" ]]; then
@@ -97,8 +112,8 @@ get_backup_config_blobs() {
           backup_err "hclq not found for parsing $config_file"
           return 1
         fi
-        mapfile -t includes < <(hclq get -i "$config_file" 'include[]' 2>/dev/null)
-        mapfile -t excludes < <(hclq get -i "$config_file" 'exclude[]' 2>/dev/null)
+        mapfile -t includes < <(hclq get -i "$config_file" 'include[]' | jq -r '.[]')
+        mapfile -t excludes < <(hclq get -i "$config_file" 'exclude[]' | jq -r '.[]')
         ;;
       *.yaml|*.yml)
         if ! command -v yq &>/dev/null; then
@@ -109,8 +124,8 @@ get_backup_config_blobs() {
         mapfile -t excludes < <(yq e '.exclude[]' "$config_file" 2>/dev/null)
         ;;
       *.json)
-        if ! jq -e . "$config_file" &>/dev/null; then
-          backup_err "Malformed JSON in $config_file"
+        if ! command -v jq &>/dev/null; then
+          backup_err "jq not found for parsing $config_file"
           return 1
         fi
         mapfile -t includes < <(jq -r '.include[]?' "$config_file" 2>/dev/null)
@@ -121,12 +136,10 @@ get_backup_config_blobs() {
         return 1
         ;;
     esac
-
     if [[ -f "$ignore_file" ]]; then
       mapfile -t extra_excludes < <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$ignore_file")
       excludes+=("${extra_excludes[@]}")
     fi
-
   elif [[ -f "$ignore_file" ]]; then
     includes=(".")
     mapfile -t excludes < <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$ignore_file")
@@ -134,7 +147,6 @@ get_backup_config_blobs() {
     includes=(".")
     excludes=(".git" "backup" "restore_*" "*.log")
   fi
-
   printf '%s\n' "${includes[@]}"
   echo "---END---"
   printf '%s\n' "${excludes[@]}"
@@ -144,29 +156,57 @@ get_backup_config_blobs() {
 create_backup_archive() {
   local root="$1" tag="$2" includes_blob="$3" excludes_blob="$4" backup_dir="$5" dryrun="${6:-false}"
   local dt archive_name
+  # echo "🟢 DEBUG"
   dt=$(date "+%Y%m%d_%H%M%S")
   archive_name="${tag:-untagged}_${dt}.tar.gz"
 
-  mapfile -t includes <<<"$includes_blob"
-  mapfile -t excludes <<<"$excludes_blob"
+  # --- EXPAND INCLUDES TO FILE LIST ---
+  # shellcheck disable=SC2207
+  mapfile -t includes < <(printf '%s\n' "$includes_blob")
+  mapfile -t excludes < <(printf '%s\n' "$excludes_blob")
+  local include_args=()
+
+  for inc in "${includes[@]}"; do
+    [[ -z "$inc" ]] && continue
+    # Special case: "*" means all files under root (recursively)
+    if [[ "$inc" == "*" ]]; then
+      while IFS= read -r -d '' match; do
+        include_args+=("${match#$root/}")
+      done < <(find "$root" -type f -print0 2>/dev/null)
+      continue
+    fi
+    # Special case: "**/*.sh" and similar recursive globs
+    if [[ "$inc" == **/* ]]; then
+      glob="${inc#**/}" # Remove leading **
+      while IFS= read -r -d '' match; do
+        include_args+=("${match#$root/}")
+      done < <(find "$root" -type f -name "$glob" -print0 2>/dev/null)
+      continue
+    fi
+    # Path-based globs (contain a slash)
+    if [[ "$inc" == */* ]]; then
+      glob_path="$root/$inc"
+      while IFS= read -r -d '' match; do
+        include_args+=("${match#$root/}")
+      done < <(find "$root" -type f -path "$glob_path" -print0 2>/dev/null)
+    else
+      # Simple filename globs ("*.sh", "README.md", etc.)
+      while IFS= read -r -d '' match; do
+        include_args+=("${match#$root/}")
+      done < <(find "$root" -type f -name "$inc" -print0 2>/dev/null)
+    fi
+  done
+
+  # Remove duplicates just in case
+  readarray -t include_args < <(printf '%s\n' "${include_args[@]}" | awk '!seen[$0]++')
+
+  # echo "🟢 DEBUG: Found files to include: ${include_args[*]}"
 
   local exclude_args=()
   for ex in "${excludes[@]}"; do
     [[ -n "$ex" ]] && exclude_args+=("--exclude=$ex")
   done
-
-  local include_args=()
-  for inc in "${includes[@]}"; do
-    matches=()
-    while IFS= read -r -d '' match; do
-      matches+=("${match#"$root"/}")
-      # matches+=("${match#$root/}")
-    done < <(find "$root" -path "$root/$inc" -print0 2>/dev/null || true)
-    include_args+=("${matches[@]}")
-  done
-
-  backup_log "Tar include args: ${include_args[*]}" >&2
-  backup_log "Tar exclude args: ${exclude_args[*]}" >&2
+  # echo "🟡 DEBUG: Exclude args: ${exclude_args[*]}"
 
   if [[ "${#include_args[@]}" -eq 0 ]]; then
     backup_warn "No includes found! Archive will not be created."
@@ -178,13 +218,20 @@ create_backup_archive() {
     return 0
   fi
 
-  # (cd "$root" && tar czf "$backup_dir/$archive_name" "${exclude_args[@]}" "${include_args[@]}")
   local abs_backup_path
   abs_backup_path="$(cd "$backup_dir" && pwd)/$archive_name"
-  (cd "$root" && tar czf "$abs_backup_path" "${exclude_args[@]}" "${include_args[@]}")
+
+  (
+    cd "$root" && \
+
+    tar czf "$abs_backup_path" "${exclude_args[@]}" "${include_args[@]}"
+  )
 
   echo "$archive_name"
 }
+
+
+
 
 # --- Main backup logic (only uses blobs) ---
 backup_project() {
@@ -197,7 +244,6 @@ backup_project() {
 
   local arr_blobs includes_blob excludes_blob
 
-  # if ! arr_blobs=$(get_backup_config_blobs "$root"); then
   if [[ -z "$config_file" ]]; then
     backup_err "No config file provided to backup_project"
     return 1
@@ -274,7 +320,6 @@ restore_backup() {
     return 1
   fi
 
-  # local restore_dir="$root/restore_$(date +%Y%m%d_%H%M%S)"
   restore_dir="$root/restore_$(date +%Y%m%d_%H%M%S)"
 
   if [[ "$dryrun" == "true" ]]; then
@@ -287,7 +332,7 @@ restore_backup() {
 }
 
 recover_backup() {
-  local backup_dir="$1" file="$2" root="$3" dryrun="${4:-false}"
+  local backup_dir="$1" file="$2" root="$3" dryrun="${4:-false}" force="${5:-false}"
   local full_path="$file"
 
   if [[ ! "$file" = /* ]] && [[ ! "$file" == ./* ]] && [[ ! "$file" == ../* ]]; then
@@ -307,15 +352,18 @@ recover_backup() {
     return 0
   fi
 
-  read -rp "⚠️  This will OVERWRITE files in $root. Continue? (y/N): " ans
-  [[ "$ans" =~ ^[Yy]$ ]] || {
-    backup_warn "❌ Aborted by user."
-    return 1
-  }
+  if [[ "$force" != "true" ]]; then
+    read -rp "⚠️  This will OVERWRITE files in $root. Continue? (y/N): " ans
+    [[ "$ans" =~ ^[Yy]$ ]] || {
+      backup_warn "❌ Aborted by user."
+      return 1
+    }
+  fi
 
   tar xzf "$full_path" -C "$root"
   backup_ok "✅ Restored $(basename "$full_path") into $(basename "$root")"
 }
+
 
 prune_backups() {
   local backup_dir="$1"
@@ -347,7 +395,6 @@ prune_backups() {
 }
 
 # --- Git tag helpers ---
-
 get_sha256() {
   local file="$1"
   if command -v shasum &>/dev/null; then
@@ -470,6 +517,37 @@ render_summary() {
     for line in "${lines[@]}"; do
       echo "$line"
     done
+  fi
+}
+
+log_restore_entry() {
+  local label="$1"
+  local archive="$2"
+  local extracted="$3"
+  local target="$4"
+  local log="$5"
+  local tpl="$6"
+
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  {
+    echo "### 🔁 Restore: $label"
+    echo "- 🗃️ Archive: \`$(basename "$archive")\`"
+    echo "- 📂 Extracted to: \`$extracted\`"
+    echo "- 🎯 Target folder: \`$target\`"
+    echo "- 🕓 Timestamp: $timestamp"
+    echo ""
+  } >> "$log"
+
+  # Optional: if $tpl is a Mustache-like template, you can render/append more fancy output
+  if [[ -f "$tpl" ]]; then
+    echo "---" >> "$log"
+    sed "s|{{ARCHIVE}}|$(basename "$archive")|g;
+         s|{{DEST}}|$extracted|g;
+         s|{{TARGET}}|$target|g;
+         s|{{LABEL}}|$label|g;
+         s|{{TIMESTAMP}}|$timestamp|g" "$tpl" >> "$log"
   fi
 }
 

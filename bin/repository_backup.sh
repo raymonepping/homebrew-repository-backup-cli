@@ -5,12 +5,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB="$SCRIPT_DIR/../core/repository_backup_lib.sh"
-
-# shellcheck source=../core/repository_backup_lib.sh
-source "$LIB"
-
 # Default settings
 # shellcheck disable=SC2034
 VERSION="1.5.0"
@@ -26,32 +20,41 @@ RESTORE_LATEST="false"
 FORCE=false
 EMERGENCY_RESTORE="false"
 SUMMARY="false"
+OUTPUT_FORMAT="plain"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB="$SCRIPT_DIR/../core/repository_backup_lib.sh"
+
+# shellcheck source=../core/repository_backup_lib.sh
+source "$LIB"
 
 
 # --- Help ---
 show_help() {
   echo "📦 repository_backup.sh (v$VERSION)"
-echo
-echo "Usage:"
-echo "  $0 --target ./your_folder [--dryrun]"
-echo
-echo "Options:"
-echo "  --target            Folder to backup (required)"
-echo "  --list              List backups for a target folder              [dryrun supported]"
-echo "  --latest            Show only the most recent backup              [dryrun supported]"
-echo "  --prune             Remove old backups (default: false)           [dryrun supported]"
-echo "  --restore           Restore from a backup archive                 [dryrun supported]"
-echo "  --restore-latest    Restore most recent backup                    [dryrun supported]"
-echo "  --restore-oldest    Restore oldest available backup               [dryrun supported]"
-echo "  --recover           Recover backup and overwrite folder           [dryrun supported]"
-echo "  --emergency-restore Restore tracked files from latest Git tag     [dryrun supported]"
-echo "  --count             How many recent backups to retain (default: 5)"
-echo "  --dryrun            Simulate, don’t create or modify anything"
-echo "  --force             Force overwrite of existing restore folder"
-echo "  --help              Show this help"
-echo
-echo "Example:"
-echo "  $0 --target ./medium_bash --restore-latest --dryrun"
+  echo
+  echo "Usage:"
+  echo "  $0 --target ./your_folder [--dryrun]"
+  echo
+  echo "Options:"
+  echo "  --target            Folder to backup (required)"
+  echo "  --list              List backups for a target folder              [dryrun supported]"
+  echo "  --latest            Show only the most recent backup              [dryrun supported]"
+  echo "  --prune             Remove old backups (default: false)           [dryrun supported]"
+  echo "  --restore           Restore from a backup archive                 [dryrun supported]"
+  echo "  --restore-latest    Restore most recent backup                    [dryrun supported]"
+  echo "  --restore-oldest    Restore oldest available backup               [dryrun supported]"
+  echo "  --recover           Recover backup and overwrite folder           [dryrun supported]"
+  echo "  --emergency-restore Restore tracked files from latest Git tag     [dryrun supported]"
+  echo "  --summary           Show summary output of recent backups"
+  echo "  --output            Output format: plain | markdown | md"
+  echo "  --count             How many recent backups to retain (default: 5)"
+  echo "  --dryrun            Simulate, don’t create or modify anything"
+  echo "  --force             Force overwrite of existing restore folder"
+  echo "  --help              Show this help"
+  echo
+  echo "Example:"
+  echo "  $0 --target ./medium_bash --restore-latest --dryrun"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -100,6 +103,10 @@ while [[ $# -gt 0 ]]; do
       COUNT="$2"
       shift 2
       ;;
+    --output)
+      OUTPUT_FORMAT="$2"
+      shift 2
+      ;;      
     --summary)
       SUMMARY=true
       shift
@@ -132,22 +139,41 @@ if [[ ! -d "$TARGET" ]]; then
   exit 1
 fi
 
+# --- Setup config format + dynamic config file path ---
+CONFIG_EXT="json"
+CONFIG_TOOL=""
+if command -v hclq &>/dev/null; then
+  CONFIG_EXT="hcl"
+  CONFIG_TOOL="hclq"
+elif command -v yq &>/dev/null; then
+  CONFIG_EXT="yaml"
+  CONFIG_TOOL="yq"
+fi
+
+CONFIG_FILE="$TARGET/.backup.${CONFIG_EXT}"
+echo "🛠️  Using config format: .$CONFIG_EXT (via $CONFIG_TOOL)"
+
 # --- Setup derived paths ---
 BACKUP_DIR="./backups/$(basename "$TARGET")"
 CATALOG_DIR="./backups/catalogs/$(basename "$TARGET")"
 
-CONFIG_FILE="$TARGET/.backup.json"
+# CONFIG_FILE="$TARGET/.backup.json"
 IGNORE_FILE="$TARGET/.backupignore"
 MDLOG="$CATALOG_DIR/backup_log.md"
 TPL="$SCRIPT_DIR/../core/backup_log.tpl"
 
 if [[ "$SUMMARY" == "true" ]]; then
-  TMP_SUMMARY=$(mktemp)
-  get_last_n_backups "$MDLOG" "$COUNT" >"$TMP_SUMMARY"
-  cat "$TMP_SUMMARY"
-  rm -f "$TMP_SUMMARY"
+  render_summary "$MDLOG" "$COUNT" "$OUTPUT_FORMAT"
   exit 0
 fi
+
+# if [[ "$SUMMARY" == "true" ]]; then
+#  TMP_SUMMARY=$(mktemp)
+# get_last_n_backups "$MDLOG" "$COUNT" >"$TMP_SUMMARY"
+# cat "$TMP_SUMMARY"
+# rm -f "$TMP_SUMMARY"
+# exit 0
+# i
 
 
 if [[ "$PRUNE" == "true" ]]; then
@@ -239,20 +265,37 @@ ensure_dirs_exist() {
 ensure_dirs_exist "$BACKUP_DIR" "$CATALOG_DIR"
 
 # --- Ensure .backup.json exists ---
+# --- Ensure .backup.{json|yaml|hcl} exists ---
 if [[ ! -f "$CONFIG_FILE" ]]; then
-  cat >"$CONFIG_FILE" <<EOF
+  echo "📄 Creating default config: $CONFIG_FILE"
+  case "$CONFIG_EXT" in
+    json)
+      cat >"$CONFIG_FILE" <<EOF
 {
-  "include": [
-    "LICENSE",
-    "README.md"
-  ],
-  "exclude": [
-    "github/*"
-  ]
+  "include": ["LICENSE", "README.md", "*.sh"],
+  "exclude": ["github/*"]
 }
 EOF
-  echo "📄 Created template: $CONFIG_FILE"
+      ;;
+    yaml)
+      cat >"$CONFIG_FILE" <<EOF
+include:
+  - LICENSE
+  - README.md
+  - "*.sh"
+exclude:
+  - github/*
+EOF
+      ;;
+    hcl)
+      cat >"$CONFIG_FILE" <<EOF
+include = ["LICENSE", "README.md", "*.sh"]
+exclude = ["github/*"]
+EOF
+      ;;
+  esac
 fi
+echo "🛠️  Using config format: .$CONFIG_EXT (via $CONFIG_TOOL)"
 
 # --- Ensure .backupignore exists ---
 if [[ ! -f "$IGNORE_FILE" ]]; then

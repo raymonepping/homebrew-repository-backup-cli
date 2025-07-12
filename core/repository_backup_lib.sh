@@ -23,6 +23,19 @@ icon_restore="💾"
 icon_prune="🧹"
 icon_info="ℹ️"
 
+detect_config_format() {
+  if command -v hclq &>/dev/null; then
+    CONFIG_FORMAT="hcl"
+    CONFIG_FILE=".backup.hcl"
+  elif command -v yq &>/dev/null; then
+    CONFIG_FORMAT="yaml"
+    CONFIG_FILE=".backup.yaml"
+  else
+    CONFIG_FORMAT="json"
+    CONFIG_FILE=".backup.json"
+  fi
+}
+
 backup_log() {
   [[ $QUIET == "true" ]] && return
   echo "${color_blue}[backup]${color_reset} $*"
@@ -71,23 +84,49 @@ ensure_git_tag() {
 
 # --- Get includes/excludes as newline blobs (no declare) ---
 get_backup_config_blobs() {
-
   local config_file="$1"
-  # local ignore_file="$(dirname "$config_file")/.backupignore"
-  ignore_file="$(dirname "$config_file")"
+  local ignore_file
+  ignore_file="$(dirname "$config_file")/.backupignore"
 
   local includes=() excludes=()
+
   if [[ -f "$config_file" ]]; then
-    if ! jq -e . "$config_file" &>/dev/null; then
-      backup_err "Malformed JSON in $config_file"
-      return 1
-    fi
-    mapfile -t includes < <(jq -r '.include[]?' "$config_file" 2>/dev/null)
-    mapfile -t excludes < <(jq -r '.exclude[]?' "$config_file" 2>/dev/null)
+    case "$config_file" in
+      *.hcl)
+        if ! command -v hclq &>/dev/null; then
+          backup_err "hclq not found for parsing $config_file"
+          return 1
+        fi
+        mapfile -t includes < <(hclq get -i "$config_file" 'include[]' 2>/dev/null)
+        mapfile -t excludes < <(hclq get -i "$config_file" 'exclude[]' 2>/dev/null)
+        ;;
+      *.yaml|*.yml)
+        if ! command -v yq &>/dev/null; then
+          backup_err "yq not found for parsing $config_file"
+          return 1
+        fi
+        mapfile -t includes < <(yq e '.include[]' "$config_file" 2>/dev/null)
+        mapfile -t excludes < <(yq e '.exclude[]' "$config_file" 2>/dev/null)
+        ;;
+      *.json)
+        if ! jq -e . "$config_file" &>/dev/null; then
+          backup_err "Malformed JSON in $config_file"
+          return 1
+        fi
+        mapfile -t includes < <(jq -r '.include[]?' "$config_file" 2>/dev/null)
+        mapfile -t excludes < <(jq -r '.exclude[]?' "$config_file" 2>/dev/null)
+        ;;
+      *)
+        backup_err "Unknown config format: $config_file"
+        return 1
+        ;;
+    esac
+
     if [[ -f "$ignore_file" ]]; then
       mapfile -t extra_excludes < <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$ignore_file")
       excludes+=("${extra_excludes[@]}")
     fi
+
   elif [[ -f "$ignore_file" ]]; then
     includes=(".")
     mapfile -t excludes < <(grep -vE '^[[:space:]]*#|^[[:space:]]*$' "$ignore_file")
@@ -95,6 +134,7 @@ get_backup_config_blobs() {
     includes=(".")
     excludes=(".git" "backup" "restore_*" "*.log")
   fi
+
   printf '%s\n' "${includes[@]}"
   echo "---END---"
   printf '%s\n' "${excludes[@]}"
@@ -405,6 +445,32 @@ perform_emergency_restore() {
   )
 
   backup_ok "✅ Emergency restore completed from tag: $latest_tag"
+}
+
+render_summary() {
+  local mdlog="$1"
+  local count="$2"
+  local format="${3:-text}"
+  local summary_path="$(dirname "$mdlog")/backup_summary.md"
+
+  mapfile -t lines < <(get_last_n_backups "$mdlog" "$count")
+
+  if [[ "$format" == "markdown" ]]; then
+    {
+      echo "| Timestamp | Tag | Parent | Commit | Archive | Size | SHA256 | Status |"
+      echo "|-----------|-----|--------|--------|---------|------|--------|--------|"
+      for line in "${lines[@]}"; do
+        IFS='|' read -r ts tag parent commit archive size hash status <<<"$line"
+        printf "| %s | %s | %s | %s | %s | %s | %s | %s |\n" \
+          "$ts" "$tag" "$parent" "$commit" "$archive" "$size" "$hash" "$status"
+      done
+    } >"$summary_path"
+    backup_ok "📄 Markdown summary written to: $summary_path"
+  else
+    for line in "${lines[@]}"; do
+      echo "$line"
+    done
+  fi
 }
 
 restore_backup_with_diff() {

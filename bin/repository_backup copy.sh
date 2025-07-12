@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Default settings
 # shellcheck disable=SC2034
-VERSION="1.2.0"
+VERSION="1.3.0"
 
 # --- Core Target/Action ---
 TARGET=""              # The directory/folder to backup or restore

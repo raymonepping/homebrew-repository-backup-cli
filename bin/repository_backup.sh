@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC2034
-VERSION="1.2.0"
+VERSION="1.3.0"
 
 # --- Core Target/Action ---
 TARGET=""
@@ -32,6 +32,12 @@ OUTPUT_FORMAT="plain"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_BACKUP_HOME="${REPO_BACKUP_HOME:-/opt/homebrew/opt/repository-backup-cli/share/repository-backup-cli}"
 
+# Handle --version
+if [[ "${1:-}" == "--version" ]]; then
+  echo "$SCRIPT_NAME v$VERSION — auto-seeding secret scanning demos"
+  exit 0
+fi
+
 # --- Help ---
 show_help() {
   echo "📦 repository_backup.sh (v$VERSION)"
@@ -55,6 +61,7 @@ show_help() {
   echo "  --dryrun            Simulate, don’t create or modify anything"
   echo "  --force             Force overwrite of existing restore folder"
   echo "  --help              Show this help"
+  echo "  --version           Show version information and exit"
   echo
   echo "Example:"
   echo "  $0 --target ./medium_bash --restore-latest --dryrun"

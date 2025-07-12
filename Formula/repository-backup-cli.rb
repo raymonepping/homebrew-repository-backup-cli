@@ -1,9 +1,9 @@
 class RepositoryBackupCli < Formula
   desc "CLI toolkit for backing up GitHub repositories with tagging, ignore rules, and recovery"
   homepage "https://github.com/raymonepping/repository_backup_cli"
-  url "https://github.com/raymonepping/homebrew-repository-backup-cli/archive/refs/tags/v1.0.6.tar.gz"
+  url "https://github.com/raymonepping/medium_scripts/archive/refs/tags/v1.1.0.tar.gz"
   
-  sha256 "3f9007346eb746792ae487d3b282bafa151465309f03e3b6b9f6292eb6c4e766"
+  sha256 "566953efd4736133aff7883cd17d2c566579cd8a03a48f6c859e41b76005a8e9"
   license "MIT"
   version "1.0.6"
 

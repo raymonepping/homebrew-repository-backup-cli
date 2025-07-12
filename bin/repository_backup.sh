@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "$0")"
 # shellcheck disable=SC2034
-VERSION="1.3.1"
+VERSION="1.3.2"
 
 # --- Core Target/Action ---
 TARGET=""
@@ -36,7 +36,7 @@ REPO_BACKUP_HOME="${REPO_BACKUP_HOME:-/opt/homebrew/opt/repository-backup-cli/sh
 
 # Handle --version
 if [[ "${1:-}" == "--version" ]]; then
-  echo "$SCRIPT_NAME v$VERSION — auto-seeding secret scanning demos"
+  echo "$SCRIPT_NAME v$VERSION — supersonic backup CLI"
   exit 0
 fi
 

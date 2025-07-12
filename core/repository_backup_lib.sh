@@ -2,7 +2,7 @@
 # --- radar_backup_lib.sh ---
 # Modular backup/restore/prune/summary logic for Radar Love (and friends)
 # shellcheck disable=SC2034
-VERSION="1.3.1"
+VERSION="1.3.2"
 
 QUIET="${QUIET:-false}"
 

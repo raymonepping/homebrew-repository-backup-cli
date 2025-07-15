@@ -1,3 +1,8 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2034
+VERSION="1.4.1"
+
 run_decision_tree() {
   tput bold; echo "📦 Repository Backup CLI Decision Tree"; tput sgr0
   echo "📂 Target folder: $(pwd)"
@@ -16,15 +21,59 @@ run_decision_tree() {
   echo "  9) Quit"
   read -n 1 -p "Select [1-9]: " choice; echo
 
-  # Get target folder (default to pwd)
-  read -e -p "Folder to backup/restore [$(pwd)]: " tgt
+  # 💡 If quit, exit now
+  if [[ "$choice" == "9" || -z "$choice" ]]; then
+    echo "👋 Exiting."
+    exit 0
+  fi
+
+  # Set context-aware prompt wording
+  case "$choice" in
+    1)
+      prompt_folder="Folder to back up"
+      prompt_outdir="Backup storage directory (where new backup will be saved)"
+      ;;
+    2)
+      prompt_folder="Folder to list backups for"
+      prompt_outdir="Backup storage directory (where backups are kept)"
+      ;;
+    3)
+      prompt_folder="Folder to restore into"
+      prompt_outdir="Backup storage directory to restore from"
+      ;;
+    4)
+      prompt_folder="Folder to restore into"
+      prompt_outdir="Backup storage directory to restore from"
+      ;;
+    5)
+      prompt_folder="Folder whose backups should be pruned"
+      prompt_outdir="Backup storage directory (where old backups are stored)"
+      ;;
+    6)
+      prompt_folder="Folder to recover/overwrite"
+      prompt_outdir="Backup storage directory to recover from"
+      ;;
+    7)
+      prompt_folder="Folder to emergency-restore into"
+      prompt_outdir="Backup storage directory to restore from"
+      ;;
+    8)
+      prompt_folder="Folder to show backup summary for"
+      prompt_outdir="Backup storage directory (where backups are kept)"
+      ;;
+    *)
+      prompt_folder="Folder"
+      prompt_outdir="Backup storage directory"
+      ;;
+  esac
+
+  # Use context-aware prompts
+  read -e -p "$prompt_folder [$(pwd)]: " tgt
   TARGET="${tgt:-$(pwd)}"
 
-  # Output dir (optional)
-  read -e -p "Output directory for backups (ENTER for default ./backups): " outdir
+  read -e -p "$prompt_outdir (ENTER for default ./backups): " outdir
   OUTPUT_DIR="${outdir:-}"
 
-  # --count for prune/backup
   if [[ "$choice" =~ ^(1|5)$ ]]; then
     read -e -p "How many backups to retain? [5]: " count
     COUNT="${count:-5}"
@@ -34,15 +83,12 @@ run_decision_tree() {
   read -n 1 -p "🧪 Dryrun/simulate mode? [y/N]: " dry; echo
   [[ "$dry" =~ ^[Yy]$ ]] && DRYRUN="--dryrun"
 
-  # Build command
   CMD="repository_backup --target \"$TARGET\""
   [[ -n "$OUTPUT_DIR" ]] && CMD+=" --output-dir \"$OUTPUT_DIR\""
   [[ -n "$DRYRUN" ]] && CMD+=" $DRYRUN"
 
   case "$choice" in
-    1) # backup
-      [[ -n "${COUNT:-}" ]] && CMD+=" --count $COUNT"
-      ;;
+    1) [[ -n "${COUNT:-}" ]] && CMD+=" --count $COUNT" ;;
     2) CMD+=" --list" ;;
     3) CMD+=" --restore-latest" ;;
     4) CMD+=" --restore-oldest" ;;
@@ -50,7 +96,6 @@ run_decision_tree() {
     6) CMD+=" --recover" ;;
     7) CMD+=" --emergency-restore" ;;
     8) CMD+=" --summary" ;;
-    9) echo "👋 Exiting."; return 0 ;;
     *) echo "❌ Invalid choice."; return 1 ;;
   esac
 

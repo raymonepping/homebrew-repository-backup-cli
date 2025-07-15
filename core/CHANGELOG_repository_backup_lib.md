@@ -2,7 +2,11 @@
 
 🔵 2025-07-12 13:25:37 — raymon.epping: repository_backup_lib.sh bumped from 1.0.0 to 1.1.0
 
-[![version](https://img.shields.io/badge/version-1.3.3-red)](https://github.com/raymonepping)
+[![version](https://img.shields.io/badge/version-1.5.0-red)](https://github.com/raymonepping)
+
+🔵 2025-07-15 14:39:12 — raymon.epping: repository_backup_lib.sh bumped from 1.4.0 to 1.5.0
+
+🔵 2025-07-15 13:05:06 — raymon.epping: repository_backup_lib.sh bumped from 1.3.3 to 1.4.0
 
 🟣 2025-07-15 12:20:40 — raymon.epping: repository_backup_lib.sh bumped from 1.3.2 to 1.3.3
 

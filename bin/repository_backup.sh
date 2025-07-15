@@ -161,6 +161,31 @@ else
 fi
 source "$LIB"
 
+if [[ $# -eq 0 ]]; then
+  # Try to source and run decision tree
+  decision_paths=(
+    "$SCRIPT_DIR/backup_decision_tree.sh"
+    "$SCRIPT_DIR/../core/backup_decision_tree.sh"
+    "$SCRIPT_DIR/../lib/backup_decision_tree.sh"
+    "/opt/homebrew/share/repository-backup-cli/core/backup_decision_tree.sh"
+  )
+  found_tree_wizard=false
+  for dp in "${decision_paths[@]}"; do
+    if [[ -f "$dp" ]]; then
+      source "$dp"
+      run_decision_tree
+      found_tree_wizard=true
+      break
+    fi
+  done
+
+  if [[ "$found_tree_wizard" == false ]]; then
+    echo "❌ Could not locate repository_decision_tree.sh"
+    exit 1
+  fi
+  exit 0
+fi
+
 # Near the end of the script after parsing and sourcing
 if [[ "$RECOVER" == "true" ]]; then
   BACKUP_DIR="./backups/$(basename "$TARGET")"

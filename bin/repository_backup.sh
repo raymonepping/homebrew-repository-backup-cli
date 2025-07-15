@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "$0")"
 # shellcheck disable=SC2034
-VERSION="1.5.0"
+VERSION="1.5.2"
 
 # --- Core Target/Action ---
 TARGET=""

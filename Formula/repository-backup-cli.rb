@@ -3,7 +3,7 @@ class RepositoryBackupCli < Formula
   homepage "https://github.com/raymonepping/repository_backup_cli"
   url "https://github.com/raymonepping/homebrew-repository-backup-cli/archive/refs/tags/v1.5.0.tar.gz"
 
-  sha256 "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"
+  sha256 "7e594e1b9d86f74c556ce37702831f6bd5623b8caf92a27b65874c466c7821ac"
   license "MIT"
   version "1.5.0"
 

@@ -9,6 +9,7 @@ Thumbs.db
 *.bak
 *.swp
 *.pid
+v*.tar.gz
 
 ########################################
 # 💻 IDE & Editor Configs

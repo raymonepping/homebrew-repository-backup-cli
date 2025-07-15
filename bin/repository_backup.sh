@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck disable=SC2034
 SCRIPT_NAME="$(basename "$0")"
 # shellcheck disable=SC2034
-VERSION="1.3.2"
+VERSION="1.3.3"
 
 # --- Core Target/Action ---
 TARGET=""
@@ -24,6 +24,8 @@ RESTORE_OLDEST="false"
 RESTORE_LATEST="false"
 FORCE="false"
 EMERGENCY_RESTORE="false"
+OUTPUT_DIR=""
+
 
 # --- Reporting/Output ---
 SUMMARY="false"
@@ -49,6 +51,7 @@ show_help() {
   echo
   echo "Options:"
   echo "  --target            Folder to backup (required)"
+  echo "  --output-dir        Directory to store backup archives (default: ./backups/<target>)"
   echo "  --list              List backups for a target folder              [dryrun supported]"
   echo "  --latest            Show only the most recent backup              [dryrun supported]"
   echo "  --prune             Remove old backups (default: false)           [dryrun supported]"
@@ -76,6 +79,10 @@ while [[ $# -gt 0 ]]; do
     TARGET="$2"
     shift 2
     ;;
+  --output-dir)
+    OUTPUT_DIR="$2"
+    shift 2
+    ;;    
   --restore)
     RESTORE="$2"
     shift 2
@@ -208,8 +215,15 @@ CONFIG_FILE="$TARGET/.backup.${CONFIG_EXT}"
 echo "🛠️  Using config format: .$CONFIG_EXT (via $CONFIG_TOOL)"
 
 # --- Setup derived paths ---
-BACKUP_DIR="./backups/$(basename "$TARGET")"
-CATALOG_DIR="./backups/catalogs/$(basename "$TARGET")"
+if [[ -n "$OUTPUT_DIR" ]]; then
+  BACKUP_DIR="${OUTPUT_DIR}/$(basename "$TARGET")"
+  CATALOG_DIR="${OUTPUT_DIR}/catalogs/$(basename "$TARGET")"
+else
+  BACKUP_DIR="./backups/$(basename "$TARGET")"
+  CATALOG_DIR="./backups/catalogs/$(basename "$TARGET")"
+fi
+# BACKUP_DIR="./backups/$(basename "$TARGET")"
+# CATALOG_DIR="./backups/catalogs/$(basename "$TARGET")"
 
 # CONFIG_FILE="$TARGET/.backup.json"
 IGNORE_FILE="$TARGET/.backupignore"

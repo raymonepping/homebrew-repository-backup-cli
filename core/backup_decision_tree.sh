@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # shellcheck disable=SC2034
-VERSION="1.4.1"
+VERSION="1.5.2"
 
 run_decision_tree() {
   tput bold; echo "📦 Repository Backup CLI Decision Tree"; tput sgr0

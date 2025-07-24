@@ -1,98 +1,170 @@
-# radar_love_cli 🔐
+# repository_backup.sh 🌳
 
-> “Cold and frosty morning. There’s not a lot to say. About the things caught in my mind..” — *Oasis*
+> "Structure isn't boring – it's your first line of clarity." — *You (probably during a cleanup)*
 
-[![brew install](https://img.shields.io/badge/brew--install-success-green?logo=homebrew&style=flat-square)](https://github.com/raymonepping/radar_love_cli)
-[![status](https://img.shields.io/badge/ci-auto--generated-blue?style=flat-square)](./sanity_check_report.md)
-[![badge](https://img.shields.io/badge/radar--ready-yes-critical?logo=githubactions&style=flat-square)](https://www.vaultproject.io/docs/secrets/radar)
-
----
-
-## 🎯 What Is This?
-
-`radar_love_cli` is a **modular, Homebrew-installable CLI** that lets you simulate realistic code leaks (secrets, PII, etc.) to test secret scanning pipelines with Vault Radar, TruffleHog, Gitleaks, and more.
+[![brew install](https://img.shields.io/badge/brew--install-success-green?logo=homebrew)](https://github.com/raymonepping/homebrew-repository_backup.sh)
+[![version](https://img.shields.io/badge/version-1.7.1-blue)](https://github.com/raymonepping/homebrew-repository_backup.sh)
 
 ---
 
-## 🧰 How to Use
+## 🧭 What Is This?
+
+repository_backup.sh is a Homebrew-installable, wizard-powered CLI.
+
+---
+
+## 🚀 Quickstart
 
 ```bash
-brew install raymonepping/tap/radar_love_cli
-radar_love --create true --build true --commit true --request true
+brew tap 
+brew install /repository_backup.sh
+repository_backup.sh
 ```
-
-All flags are optional. This CLI wraps and coordinates a set of deeply integrated scripts.
 
 ---
 
-## 📂 Structure
+Want to customize?
+
+```bash
+export FOLDER_TREE_HOME=/opt/homebrew/opt/..
+```
+
+---
+
+## 📂 Project Structure
 
 ```
-.
-├── bin/                 # Main CLI symlink (radar_love)
-├── core/                # Modular bash logic
-│   ├── commit_gh.sh     # GitHub commit helper
-│   ├── validate_env.sh  # Dependency checker
-│   └── ...
-├── templates/           # TPL/JSON banners
-├── test/                # (Reserved for testing)
-├── radar_love_cli.rb    # Homebrew formula
-├── README.md            # This file
-└── .brewinfo            # (Optional brew metadata)
+./
+├── bin/
+│   ├── CHANGELOG_repository_backup.md*
+│   └── repository_backup.sh*
+├── core/
+│   ├── .backup.json
+│   ├── .backupignore
+│   ├── backup_decision_tree.sh
+│   ├── backup_log.tpl
+│   ├── CHANGELOG_repository_backup_lib.md
+│   ├── footer.tpl
+│   ├── header.tpl
+│   ├── README.tpl
+│   └── repository_backup_lib.sh*
+├── Formula/
+│   └── repository-backup-cli.rb
+├── templates/
+│   ├── .keep
+│   ├── footer.tpl
+│   ├── header.tpl
+│   └── README.tpl
+├── test/
+│   ├── .gitkeep
+│   └── .keep
+├── tpl/
+│   ├── readme_01_header.tpl
+│   ├── readme_02_project.tpl
+│   ├── readme_03_structure.tpl
+│   ├── readme_04_body.tpl
+│   ├── readme_05_quote.tpl
+│   ├── readme_06_article.tpl
+│   └── readme_07_footer.tpl
+├── .backup.hcl
+├── .backup.json
+├── .backup.yaml
+├── .backupignore
+├── .brewinfo
+├── .version
+├── FOLDER_TREE.md
+├── LICENSE
+├── README.md.old
+├── reload_version.sh*
+├── repos_report.md
+├── sanity_check.md
+└── update_formula.sh*
+
+7 directories, 38 files
 ```
+
+---
+
+## 🧭 What Is This?
+
+repository-backup-cli is a Homebrew-installable, wizard-powered CLI for creating, restoring, and managing smart backups of your GitHub repositories and project folders.
+It’s especially useful for:
+
+- Developers and teams who want versioned, tag-aware backups—no more lost code or forgotten history
+- Anyone who needs fast, repeatable recovery for GitHub repos or project folders (with support for prune, dryrun, and restore)
+- Automating disaster recovery and snapshotting in CI/CD or local scripts
 
 ---
 
 ## 🔑 Key Features
 
-- ✅ One CLI to orchestrate your entire Radar demo  
-- 🧪 Includes leak builders, commit triggers, PR scans  
-- 📎 Built-in GitHub automation (via `gh`)  
-- 🔍 Environment validator with `--validate`  
-- 🧼 CI-ready with `--quiet`, `--debug`, and `--status`  
+- Backup one or many GitHub repositories with a single command
+- Smart backup cataloging with tagging, ignore rules, and backup summaries
+- Supports full, incremental, and emergency restore flows
+- Optional dry-run and integrity verification with checksums (MD5, etc.)
+ 
+Markdown summaries for every operation—easy to audit and share
+
+Modular structure for easy scripting and Homebrew upgrades
 
 ---
 
-## ✨ Example Scenarios
+### Auto-generate a Homebrew audit report
 
 ```bash
-# Minimal demo run with default values
-radar_love
-
-# Full cycle with debug and fresh rebuild
-radar_love --fresh true --build true --commit true --request true --debug compact
-
-# Validate dependencies only
-radar_love --validate
+repository_backup.sh
 ```
 
 ---
 
-## 🚧 Flags Reference
+### ✨ Other CLI tooling available
 
-All supported flags can be viewed with:
+✅ **brew-brain-cli**  
+CLI toolkit to audit, document, and manage your Homebrew CLI arsenal with one meta-tool
 
-```bash
-radar_love --help
-```
+✅ **bump-version-cli**  
+CLI toolkit to bump semantic versions in Bash scripts and update changelogs
+
+✅ **commit-gh-cli**  
+CLI toolkit to commit, tag, and push changes to GitHub
+
+✅ **folder-tree-cli**  
+CLI toolkit to visualize folder structures with Markdown reports
+
+✅ **radar-love-cli**  
+CLI toolkit to simulate secret leaks and trigger GitHub PR scans
+
+✅ **repository-audit-cli**  
+CLI toolkit to audit Git repositories and folders, outputting Markdown/CSV/JSON reports
+
+✅ **repository-backup-cli**  
+CLI toolkit to back up GitHub repositories with tagging, ignore rules, and recovery
+
+✅ **repository-export-cli**  
+CLI toolkit to export, document, and manage your GitHub repositories from the CLI
+
+✅ **self-doc-gen-cli**  
+CLI toolkit for self-documenting CLI generation with Markdown templates and folder visualization
 
 ---
 
 ## 🧠 Philosophy
 
-This toolkit was born from a simple need: demo secret-scanning tools in the most realistic way possible — without real leaks, with full automation, and with style.
+repository_backup.sh 
 
-It grew into a modular, CI-aware CLI that now installs via Homebrew.  
-Because automation should automate itself. 🚀
+> Some might say that sunshine follows thunder
+> Go and tell it to the man who cannot shine
 
-> “And as the day was dawning. My plane flew away. With all the things caught in my mind..” — *Oasis*
+> Some might say that we should never ponder
+> On our thoughts today ‘cos they hold sway over time
 
 ---
 
-© 2025 Raymon Epping
+## 📘 Read the Full Medium.com article
 
-🧠 Powered by `radar_love.sh` — 📚 Related Articles
+📖 [Article](..) 
 
-- 📖 [Part I – From Dream to Demo](https://medium.com/continuous-insights/from-dream-to-demo-building-an-automated-secret-scanning-pipeline-064a64971f64)  
-- 🛠️ [Part II – From Vision to Version](https://medium.com/@raymonepping/from-vision-to-version-evolving-radar-love-with-flags-validation-and-ci-swagger-83610d549412)  
-- 📦 Part III – Packaging `radar_love_cli` (TBD)
+---
+
+© 2025 Your Name  
+🧠 Powered by self_docs.sh — 🌐 Works locally, CI/CD, and via Brew
